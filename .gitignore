@@ -1,3 +1,6 @@
+# Project exclusions
+**/_misc/*
+
 # Terraform
 .terraform/
 **/.terraform/
