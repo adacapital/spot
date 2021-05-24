@@ -12,7 +12,6 @@ SPOT is provided free of charge to the Cardano stake pool operator community.
 If you want to support its continued development, you can delegate or recommend the pools of our contributors:
 
 - [Thomas Langlois](https://github.com/adacapital) - [**ADAK**](https://adacapital.io/)
-- [Thomas Langlois](https://github.com/adacapital) - [**ADAK**](https://adacapital.io/)
 
 ## License
 
