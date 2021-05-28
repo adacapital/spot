@@ -1,7 +1,9 @@
 #!/bin/bash
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+NOW=`date +"%Y%m%d_%H%M%S"`
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
 
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
@@ -16,8 +18,8 @@ sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev l
 echo
 echo '---------------- Tweaking chrony and sysctl configurations ----------------'
 # backuping conf files
-sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$now
-sudo cp /etc/sysctl.conf /etc/sysctl.conf.$now
+sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$NOW
+sudo cp /etc/sysctl.conf /etc/sysctl.conf.$NOW
 # replacing conf files with our own version
 sudo cp ./config/chrony.conf /etc/chrony/chrony.conf
 sudo cp ./config/sysctl.conf /etc/sysctl.conf
@@ -117,8 +119,8 @@ git checkout tags/1.26.1
 cabal configure --with-compiler=ghc-8.10.4
 echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
 ~/.local/bin/cabal build all
-cp -p "$($NS_PATH/bin-path.sh cardano-cli)" ~/.local/bin/
-cp -p "$($NS_PATH/bin-path.sh cardano-node)" ~/.local/bin/
+cp -p "$($NS_PATH/bin_path.sh cardano-cli)" ~/.local/bin/
+cp -p "$($NS_PATH/bin_path.sh cardano-node)" ~/.local/bin/
 cardano-cli --version
 
 echo
@@ -140,6 +142,8 @@ sed -i 's/testnet-shelley-genesis/sgenesis/g' config.json
 cp ./* ~/node.bp/config
 # todo upgrade sed commands to match target config currently set in node.relay and node.bp folders
 
+# setting up important environment variables
+
 echo "\$CARDANO_NODE_SOCKET_PATH Before: $CARDANO_NODE_SOCKET_PATH"
 if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/node.relay/socket:"* ]]; then
     echo "\$HOME/node.relay/socket not found in \$CARDANO_NODE_SOCKET_PATH"
@@ -153,43 +157,15 @@ else
 fi
 echo "\$CARDANO_NODE_SOCKET_PATH After: $CARDANO_NODE_SOCKET_PATH"
 
-echo
-echo '---------------- Preparing run files ----------------'
-# todo cp relay & bp run files and replace ip, port with relevant ones
-# todo cp relay topology_updater.sh
+if [[ ! ":$SPOT_PATH:" == *":$SPOT_DIR:"* ]]; then
+    echo "\$SPOT_DIR not found in \$SPOT_PATH"
+    echo "Tweaking your .bashrc"
+    echo $"if [[ ! ":'$SPOT_PATH':" == *":$SPOT_DIR:"* ]]; then
+    export SPOT_PATH=$SPOT_DIR
+fi" >> ~/.bashrc
+    eval "$(cat ~/.bashrc | tail -n +10)"
+else
+    echo "\$SPOT_DIR found in \$SPOT_PATH, nothing to change here."
+fi
+echo "\$SPOT_PATH After: $SPOT_PATH"
 
-echo
-echo '---------------- Preparing devops files ----------------'
-# todo cp devops scripts
-sudo apt install bc tcptraceroute curl -y
-
-# installing gLiveView tool for relay node
-cd ~/node.relay
-curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
-curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
-chmod 755 gLiveView.sh
-
-sed -i env \
-    -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.relay\"/g" \
-    -e "s/CNODE_PORT=6000/CNODE_PORT=3001/g" \
-    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
-    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
-    -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
-    -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
-    -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
-
-
-# installing gLiveView tool for bp node
-cd ~/node.bp
-curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
-curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
-chmod 755 gLiveView.sh
-
-sed -i env \
-    -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.bp\"/g" \
-    -e "s/CNODE_PORT=6000/CNODE_PORT=3000/g" \
-    -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
-    -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
-    -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
-    -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
-    -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"

@@ -1,6 +1,12 @@
 #!/bin/bash
 source $HOME/stake-pool-tools/node-scripts/utils.sh
 
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+PARENT_SCRIPT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+echo $SCRIPT_DIR
+echo $PARENT_SCRIPT_DIR
+exit 1
+
 if promptyn "do you want to continue? (y/n)"; then
     echo "yes"
 else

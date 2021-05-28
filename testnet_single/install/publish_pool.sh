@@ -5,7 +5,10 @@ now=`date +"%Y%m%d_%H%M%S"`
 # relay node home directory
 NODE_HOME=$HOME/node.relay
 
-# # Schedule topology_updater to run every hour
+# copy topology_updater script to its target directory
+cp $SPOT_PATH/install/topology_updater.sh $NODE_HOME
+
+# Schedule topology_updater to run every hour
 # todo check if topology_updater is not already in crontab, if so skip this step
 cat > $NODE_HOME/crontab-fragment.txt << EOF
 28 * * * * ${NODE_HOME}/topology_updater.sh

@@ -19,7 +19,7 @@ BLOCKPRODUCING_PORT=3000
 
 mkdir -p $HOME/node.bp/cncli
 
-cat > $HOME/node.bp/cncli/cncli-sync.service << EOF
+cat > $HOME/node.bp/cncli/cncli_sync.service << EOF
 [Unit]
 Description=CNCLI Sync
 After=multi-user.target
@@ -35,13 +35,16 @@ KillSignal=SIGINT
 SuccessExitStatus=143
 StandardOutput=syslog
 StandardError=syslog
-SyslogIdentifier=cncli-sync
+SyslogIdentifier=cncli_sync
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-sudo mv $HOME/node.bp/cncli/cncli-sync.service /etc/systemd/system/cncli-sync.service
+sudo mv $HOME/node.bp/cncli/cncli_sync.service /etc/systemd/system/cncli_sync.service
 
 sudo systemctl daemon-reload
-sudo systemctl start cncli-sync.service
+sudo systemctl enable cncli_sync
+sudo systemctl start cncli_sync.service
+
+# note cncli service logs can be seen in /var/log/syslog
