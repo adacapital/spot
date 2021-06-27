@@ -51,6 +51,8 @@ else
     exit 1
 fi
 
+exit 1
+
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
 sudo unattended-upgrade -d
@@ -235,6 +237,8 @@ if [[ $NODE_TYPE == "bp" ]]; then
         status=$( echo $? )
         if [[ $status == 0 ]] ; then
             echo "Online"
+            echo '---------------- Copying pool_topology file... ----------------'
+            scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/pool_topology cardano@${RELAY_IPS[$i]}:/home/cardano
             echo '---------------- Copying cardano binaries... ----------------'
             ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'mkdir -p ~/.local/bin'
             scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
