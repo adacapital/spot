@@ -51,8 +51,6 @@ else
     exit 1
 fi
 
-exit 1
-
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
 sudo unattended-upgrade -d
