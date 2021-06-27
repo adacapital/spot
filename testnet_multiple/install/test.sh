@@ -1,4 +1,43 @@
 #!/bin/bash
+TOPO_FILE=~/pool_topology
+MY_IP=$(hostname -I | xargs)
+NODE_TYPE=""
+RELAYS=()
+echo "MY_IP: ${MY_IP}"
+
+if [[ -f "$TOPO_FILE" ]]; then
+    echo "Working on topo file..."
+    while IFS= read -r TOPO; do
+        echo $TOPO
+        if [[ ! -z $TOPO ]]; then
+            TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
+            TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
+            #echo "TOPO_IP: ${TOPO_IP}"
+            #echo "TOPO_NAME: ${TOPO_NAME}"
+            if [[ $TOPO_IP == $MY_IP ]]; then
+                if [[ "$TOPO_NAME" == *"bp"* ]]; then
+                    NODE_TYPE="bp"
+                elif [[ "$TOPO_NAME" == *"relay"* ]]; then
+                    NODE_TYPE="relay"
+                fi
+            else
+                if [[ "$TOPO_NAME" == *"relay"* ]]; then
+                    RELAYS+=($TOPO_IP)
+                fi
+            fi
+        fi
+    done <$TOPO_FILE
+
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAYS: ${RELAYS[@]}"
+    echo "RELAYS length: ${#RELAYS[@]}"
+else 
+    echo "$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
+    exit 1
+fi
+
+exit 1
+
 source $HOME/stake-pool-tools/node-scripts/utils.sh
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"

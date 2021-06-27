@@ -5,6 +5,11 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 
+echo "INIT SCRIPT STARTING..."
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "NS_PATH: $NS_PATH"
+
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
 sudo unattended-upgrade -d
@@ -21,8 +26,8 @@ echo '---------------- Tweaking chrony and sysctl configurations ---------------
 sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$NOW
 sudo cp /etc/sysctl.conf /etc/sysctl.conf.$NOW
 # replacing conf files with our own version
-sudo cp ./config/chrony.conf /etc/chrony/chrony.conf
-sudo cp ./config/sysctl.conf /etc/sysctl.conf
+sudo cp $SCRIPT_DIR/config/chrony.conf /etc/chrony/chrony.conf
+sudo cp $SCRIPT_DIR/config/sysctl.conf /etc/sysctl.conf
 sudo sysctl --system
 sudo systemctl restart chrony
 
@@ -80,7 +85,7 @@ git checkout 66f017f1
 make
 sudo make install
 
-Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
+# Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
 echo "\$LD_LIBRARY_PATH Before: $LD_LIBRARY_PATH"
 if [[ ! ":$LD_LIBRARY_PATH:" == *":/usr/local/lib:"* ]]; then
     echo "/usr/local/lib not found in \$LD_LIBRARY_PATH"
@@ -94,7 +99,7 @@ else
 fi
 echo "\$LD_LIBRARY_PATH After: $LD_LIBRARY_PATH"
 
-Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
+# Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
 echo "\$PKG_CONFIG_PATH Before: $PKG_CONFIG_PATH"
 if [[ ! ":$PKG_CONFIG_PATH:" == *":/usr/local/lib/pkgconfig:"* ]]; then
     echo "/usr/local/lib/pkgconfig not found in \$PKG_CONFIG_PATH"
@@ -115,7 +120,8 @@ git clone https://github.com/input-output-hk/cardano-node.git
 cd cardano-node
 git fetch --all --recurse-submodules --tags
 git tag
-git checkout tags/1.26.1
+LATEST_TAG=$(curl -s https://api.github.com/repos/input-output-hk/cardano-node/releases/latest | jq -r .tag_name)
+git checkout tags/$LATEST_TAG
 cabal configure --with-compiler=ghc-8.10.4
 echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
 ~/.local/bin/cabal build all
@@ -168,4 +174,6 @@ else
     echo "\$SPOT_DIR found in \$SPOT_PATH, nothing to change here."
 fi
 echo "\$SPOT_PATH After: $SPOT_PATH"
+
+echo "INIT SCRIPT COMPLETED."
 

@@ -1,9 +1,55 @@
 #!/bin/bash
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
+TOPO_FILE=~/pool_topology
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
+
+echo "INIT SCRIPT STARTING..."
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "NS_PATH: $NS_PATH"
+
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
+MY_IP=$(hostname -I | xargs)
+NODE_TYPE=""
+RELAY_IPS=()
+RELAY_NAMES=()
+echo "MY_IP: ${MY_IP}"
+
+if [[ -f "$TOPO_FILE" ]]; then
+    echo "Working on topo file..."
+    while IFS= read -r TOPO; do
+        echo $TOPO
+        if [[ ! -z $TOPO ]]; then
+            TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
+            TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
+            #echo "TOPO_IP: ${TOPO_IP}"
+            #echo "TOPO_NAME: ${TOPO_NAME}"
+            if [[ $TOPO_IP == $MY_IP ]]; then
+                if [[ "$TOPO_NAME" == *"bp"* ]]; then
+                    NODE_TYPE="bp"
+                elif [[ "$TOPO_NAME" == *"relay"* ]]; then
+                    NODE_TYPE="relay"
+                fi
+            else
+                if [[ "$TOPO_NAME" == *"relay"* ]]; then
+                    RELAY_IPS+=($TOPO_IP)
+                    RELAY_NAMES+=($TOPO_NAME)
+                fi
+            fi
+        fi
+    done <$TOPO_FILE
+
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+else 
+    echo "$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
+    exit 1
+fi
 
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
@@ -21,10 +67,12 @@ echo '---------------- Tweaking chrony and sysctl configurations ---------------
 sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$NOW
 sudo cp /etc/sysctl.conf /etc/sysctl.conf.$NOW
 # replacing conf files with our own version
-sudo cp ./config/chrony.conf /etc/chrony/chrony.conf
-sudo cp ./config/sysctl.conf /etc/sysctl.conf
+sudo cp $SCRIPT_DIR/config/chrony.conf /etc/chrony/chrony.conf
+sudo cp $SCRIPT_DIR/config/sysctl.conf /etc/sysctl.conf
 sudo sysctl --system
 sudo systemctl restart chrony
+
+# todo add sshd tweaks
 
 echo
 echo '---------------- Installing Cabal ----------------'
@@ -80,7 +128,7 @@ git checkout 66f017f1
 make
 sudo make install
 
-Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
+# Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
 echo "\$LD_LIBRARY_PATH Before: $LD_LIBRARY_PATH"
 if [[ ! ":$LD_LIBRARY_PATH:" == *":/usr/local/lib:"* ]]; then
     echo "/usr/local/lib not found in \$LD_LIBRARY_PATH"
@@ -94,7 +142,7 @@ else
 fi
 echo "\$LD_LIBRARY_PATH After: $LD_LIBRARY_PATH"
 
-Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
+# Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
 echo "\$PKG_CONFIG_PATH Before: $PKG_CONFIG_PATH"
 if [[ ! ":$PKG_CONFIG_PATH:" == *":/usr/local/lib/pkgconfig:"* ]]; then
     echo "/usr/local/lib/pkgconfig not found in \$PKG_CONFIG_PATH"
@@ -108,30 +156,35 @@ else
 fi
 echo "\$PKG_CONFIG_PATH After: $PKG_CONFIG_PATH"
 
-echo
-echo '---------------- Building the node from source ----------------'
-cd ~/download
-git clone https://github.com/input-output-hk/cardano-node.git
-cd cardano-node
-git fetch --all --recurse-submodules --tags
-git tag
-git checkout tags/1.26.1
-cabal configure --with-compiler=ghc-8.10.4
-echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
-~/.local/bin/cabal build all
-cp -p "$($NS_PATH/bin_path.sh cardano-cli)" ~/.local/bin/
-cp -p "$($NS_PATH/bin_path.sh cardano-node)" ~/.local/bin/
-cardano-cli --version
+if [[ $NODE_TYPE == "bp" ]]; then
+    echo
+    echo '---------------- Building the node from source ----------------'
+    cd ~/download
+    git clone https://github.com/input-output-hk/cardano-node.git
+    cd cardano-node
+    git fetch --all --recurse-submodules --tags
+    git tag
+    LATEST_TAG=$(curl -s https://api.github.com/repos/input-output-hk/cardano-node/releases/latest | jq -r .tag_name)
+    git checkout tags/$LATEST_TAG
+    cabal configure --with-compiler=ghc-8.10.4
+    echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
+    ~/.local/bin/cabal build all
+    cp -p "$($NS_PATH/bin_path.sh cardano-cli)" ~/.local/bin/
+    cp -p "$($NS_PATH/bin_path.sh cardano-node)" ~/.local/bin/
+    cardano-cli --version
+fi
 
 echo
 echo '---------------- Preparing topology, genesis and config files ----------------'
-mkdir -p ~/node.relay/config
-mkdir -p ~/node.relay/socket
-mkdir -p ~/node.relay/logs
-mkdir -p ~/node.bp/config
-mkdir -p ~/node.bp/socket
-mkdir -p ~/node.bp/logs
-cd ~/node.relay/config
+NODE_DIR="node.bp"
+if [[ $NODE_TYPE == "bp" ]]; then
+    NODE_DIR="node.relay"
+fi
+
+mkdir -p ~/$NODE_DIR/config
+mkdir -p ~/$NODE_DIR/socket
+mkdir -p ~/$NODE_DIR/logs
+cd ~/$NODE_DIR/config
 wget -O config.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-config.json
 wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-byron-genesis.json
 wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-shelley-genesis.json
@@ -139,21 +192,21 @@ wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-dep
 sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json
 sed -i 's/testnet-byron-genesis/bgenesis/g' config.json
 sed -i 's/testnet-shelley-genesis/sgenesis/g' config.json
-cp ./* ~/node.bp/config
+
 # todo upgrade sed commands to match target config currently set in node.relay and node.bp folders
 
 # setting up important environment variables
 
 echo "\$CARDANO_NODE_SOCKET_PATH Before: $CARDANO_NODE_SOCKET_PATH"
-if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/node.relay/socket:"* ]]; then
-    echo "\$HOME/node.relay/socket not found in \$CARDANO_NODE_SOCKET_PATH"
+if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/$NODE_DIR/socket:"* ]]; then
+    echo "\$HOME/$NODE_DIR/socket not found in \$CARDANO_NODE_SOCKET_PATH"
     echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/node.relay/socket:"* ]]; then
-    export CARDANO_NODE_SOCKET_PATH=\$HOME/node.relay/socket
+    echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/'$NODE_DIR'/socket:"* ]]; then
+    export CARDANO_NODE_SOCKET_PATH=\$HOME/\$NODE_DIR/socket
 fi" >> ~/.bashrc
     eval "$(cat ~/.bashrc | tail -n +10)"
 else
-    echo "\$HOME/node.relay/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
+    echo "\$HOME/\$NODE_DIR/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
 fi
 echo "\$CARDANO_NODE_SOCKET_PATH After: $CARDANO_NODE_SOCKET_PATH"
 
@@ -168,4 +221,28 @@ else
     echo "\$SPOT_DIR found in \$SPOT_PATH, nothing to change here."
 fi
 echo "\$SPOT_PATH After: $SPOT_PATH"
+
+if [[ $NODE_TYPE == "bp" ]]; then
+    echo
+    echo '---------------- Getting other peers ready... ----------------'
+
+    RELAYS_COUNT=${#RELAY_IPS[@]}
+
+    for (( i=0; i<${RELAYS_COUNT}; i++ ));
+    do
+        echo "Checking ${RELAY_IPS[$i]} is online..."
+        ping -c1 -W1 -q ${RELAY_IPS[$i]} &>/dev/null
+        status=$( echo $? )
+        if [[ $status == 0 ]] ; then
+            echo "Online"
+            echo '---------------- Copying cardano binaries... ----------------'
+            ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'mkdir -p ~/.local/bin'
+            scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
+        else
+            echo "Offline"
+        fi
+    done
+fi
+
+echo "INIT SCRIPT COMPLETED."
 
