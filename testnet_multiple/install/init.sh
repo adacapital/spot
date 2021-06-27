@@ -177,7 +177,7 @@ fi
 echo
 echo '---------------- Preparing topology, genesis and config files ----------------'
 NODE_DIR="node.bp"
-if [[ $NODE_TYPE == "bp" ]]; then
+if [[ $NODE_TYPE == "relay" ]]; then
     NODE_DIR="node.relay"
 fi
 
@@ -201,12 +201,12 @@ echo "\$CARDANO_NODE_SOCKET_PATH Before: $CARDANO_NODE_SOCKET_PATH"
 if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/$NODE_DIR/socket:"* ]]; then
     echo "\$HOME/$NODE_DIR/socket not found in \$CARDANO_NODE_SOCKET_PATH"
     echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/'$NODE_DIR'/socket:"* ]]; then
-    export CARDANO_NODE_SOCKET_PATH=\$HOME/\$NODE_DIR/socket
+    echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/$NODE_DIR/socket:"* ]]; then
+    export CARDANO_NODE_SOCKET_PATH=\$HOME/$NODE_DIR/socket
 fi" >> ~/.bashrc
     eval "$(cat ~/.bashrc | tail -n +10)"
 else
-    echo "\$HOME/\$NODE_DIR/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
+    echo "\$HOME/$NODE_DIR/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
 fi
 echo "\$CARDANO_NODE_SOCKET_PATH After: $CARDANO_NODE_SOCKET_PATH"
 
