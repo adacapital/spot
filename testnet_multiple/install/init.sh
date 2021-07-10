@@ -11,43 +11,25 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
 echo "NS_PATH: $NS_PATH"
 
+# todo, manage air-gapped machine which should only run dependencies installation an exit!
+
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
-MY_IP=$(hostname -I | xargs)
-NODE_TYPE=""
-RELAY_IPS=()
-RELAY_NAMES=()
-echo "MY_IP: ${MY_IP}"
 
-if [[ -f "$TOPO_FILE" ]]; then
-    echo "Working on topo file..."
-    while IFS= read -r TOPO; do
-        echo $TOPO
-        if [[ ! -z $TOPO ]]; then
-            TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
-            TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
-            #echo "TOPO_IP: ${TOPO_IP}"
-            #echo "TOPO_NAME: ${TOPO_NAME}"
-            if [[ $TOPO_IP == $MY_IP ]]; then
-                if [[ "$TOPO_NAME" == *"bp"* ]]; then
-                    NODE_TYPE="bp"
-                elif [[ "$TOPO_NAME" == *"relay"* ]]; then
-                    NODE_TYPE="relay"
-                fi
-            else
-                if [[ "$TOPO_NAME" == *"relay"* ]]; then
-                    RELAY_IPS+=($TOPO_IP)
-                    RELAY_NAMES+=($TOPO_NAME)
-                fi
-            fi
-        fi
-    done <$TOPO_FILE
+read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/2"
+let cnt2="$cnt - $cnt1"
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
 
+if [[ -z $ERROR ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
     echo "RELAY_IPS: ${RELAY_IPS[@]}"
     echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
-else 
-    echo "$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
+else
+    echo "ERROR: $ERROR"
     exit 1
 fi
 
@@ -60,6 +42,7 @@ echo '---------------- Installing dependencies ----------------'
 sudo apt-get update -y
 sudo apt-get upgrade -y
 sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf -y
+sudo apt-get install bc tcptraceroute curl -y
 
 echo
 echo '---------------- Tweaking chrony and sysctl configurations ----------------'
