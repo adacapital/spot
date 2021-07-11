@@ -185,7 +185,7 @@ if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/$NODE_DIR/socket:"* ]]; then
     echo "\$HOME/$NODE_DIR/socket not found in \$CARDANO_NODE_SOCKET_PATH"
     echo "Tweaking your .bashrc"
     echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/$NODE_DIR/socket:"* ]]; then
-    export CARDANO_NODE_SOCKET_PATH=\$HOME/$NODE_DIR/socket
+    export CARDANO_NODE_SOCKET_PATH=\$HOME/$NODE_DIR/socket/node.socket
 fi" >> ~/.bashrc
     eval "$(cat ~/.bashrc | tail -n +10)"
 else
@@ -228,6 +228,9 @@ if [[ $NODE_TYPE == "bp" ]]; then
         fi
     done
 fi
+
+# there you need to start one of the relays, let it sync, then tar,move,untar the socket/db dir to all other nodes
+# then you can start the bp node as a relay, then do init_stake etc...
 
 echo "INIT SCRIPT COMPLETED."
 

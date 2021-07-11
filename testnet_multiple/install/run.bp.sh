@@ -13,3 +13,4 @@ cardano-node run \
   --shelley-kes-key ~/pool_keys/kes.skey \
   --shelley-vrf-key ~/pool_keys/vrf.skey \
   --shelley-operational-certificate ~/pool_keys/node.cert
+  
