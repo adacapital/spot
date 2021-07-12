@@ -64,12 +64,13 @@ else
     save_state STATE_STEP_ID STATE_LAST_DATE
 fi
 
-print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE
+print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
 
-echo
-echo '---------------- Generating payment and stake keys / addresses ----------------'
 
 if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 0 ]]; then
+    echo
+    echo '---------------- Generating payment and stake keys / addresses ----------------'
+
     echo "Install state, script: init_stake, step: $STATE_STEP_ID, generating payment key and stake key/address:"
     cd $HOME
     mkdir -p keys
@@ -162,11 +163,16 @@ while [ "$NEXT_STEP_OK" -eq 0 ]; do
     read -p "Press enter to continue"
     # load state
     . "$STATE_FILE" 2>/dev/null || :
-    print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE
+    print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
+    echo 
 
-    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 2 ]]; then
+    if [[ $STATE_SUB_STEP_ID == "sign.trans" && $IS_AIR_GAPPED == 0 ]]; then
+        echo "Warning, to proceed further your environment must be air-gapped."
+    fi
+
+    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
         NEXT_STEP_OK=1
-    elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 ]]; then
+    elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
         NEXT_STEP_OK=1
     fi
 done
@@ -174,7 +180,7 @@ done
 echo
 echo '---------------- Registering staking adddress ----------------'
 
-if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 ]]; then
+if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
     # retrieve the stake address deposit parameter
     STAKE_ADDRESS_DEPOSIT=$(cardano-cli query protocol-parameters --testnet-magic 1097911063 | jq -r '.stakeAddressDeposit')
     echo "STAKE_ADDRESS_DEPOSIT: $STAKE_ADDRESS_DEPOSIT"
@@ -188,7 +194,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 ]]; then
 
     # creating and sending a transaction to register our staking address onto the blockchain
     $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_ADDRESS_DEPOSIT NONE NONE $HOME/keys/stake.cert
-elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 2 ]]; then
+elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our staking address onto the blockchain
-    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_ADDRESS_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/keys/stake.cert
+    $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/keys/stake.cert
 fi
