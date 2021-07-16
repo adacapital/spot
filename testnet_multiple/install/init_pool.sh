@@ -57,13 +57,19 @@ if [ -f "$STATE_FILE" ]; then
     # Source the state file to restore state
     . "$STATE_FILE" 2>/dev/null || :
 
-    if [[ $STATE_STEP_ID != 1 && $STATE_SUB_STEP_ID != "completed.trans" ]]; then
+    if [[ $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID != "completed.trans" ]]; then
         echo
         print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
         echo
         echo "State file is not as expected. Make sure to complete successfuly the init_stake step first."
         echo "Bye for now."
         exit 1
+    elif [[ $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "cold.keys" ]]; then
+        if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
+            echo "Warning, to proceed further your environment must be air-gapped."
+            echo "Bye for now!"
+            exit 1
+        fi
     else
         STATE_STEP_ID=2
         STATE_SUB_STEP_ID="init"
@@ -133,7 +139,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 2 && $STATE
     echo "#!/bin/bash
 mkdir -p $HOME/pool_keys
 mv kes.vkey $HOME/pool_keys
-echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
+echo \"state applied, please now run init_pool.sh\"" > $STATE_APPLY_SCRIPT
 fi
 
 if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "cold.keys" ]]; then
@@ -149,16 +155,48 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 2 && $S
     --cold-signing-key-file cold.skey \
     --operational-certificate-issue-counter-file cold.counter
 
+    cd $HOME/pool_keys
+
     echo
     echo '---------------- Generating the operational certificate ----------------'
 
     cardano-cli node issue-op-cert \
-    --kes-verification-key-file kes.vkey \
-    --cold-signing-key-file cold.skey \
-    --operational-certificate-issue-counter cold.counter \
+    --kes-verification-key-file $HOME/pool_keys/kes.vkey \
+    --cold-signing-key-file $HOME/cold_keys/cold.skey \
+    --operational-certificate-issue-counter $HOME/cold_keys/cold.counter \
     --kes-period $KES_PERIOD \
     --out-file node.cert
 
     echo
     echo '---------------- Moving cold keys to secure storage ----------------'
+    # todo
+
+    STATE_SUB_STEP_ID="completed"
+    STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE
+
+    # make sure path to usb key is set as a global variable and add it to .bashrc
+    if [[ -z "$SPOT_USB_KEY" ]]; then
+        read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
+    
+        # add it to .bashrc
+        echo $"if [[ -z \$SPOT_USB_KEY ]]; then
+    export SPOT_USB_KEY=$SPOT_USB_KEY
+fi" >> ~/.bashrc
+        eval "$(cat ~/.bashrc | tail -n +10)"
+        echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
+    fi
+
+    # copy certain files to usb key to continue operations on bp node
+    cp $STATE_FILE $SPOT_USB_KEY
+    cp $HOME/pool_keys/node.cert $SPOT_USB_KEY
+    STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
+    echo "#!/bin/bash
+mkdir -p $HOME/keys
+mv node.cert $HOME/pool_keys
+chmod 400 $HOME/pool_keys/node.cert
+echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+
+    echo
+    echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
 fi
