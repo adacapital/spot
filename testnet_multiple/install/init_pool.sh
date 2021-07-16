@@ -1,56 +1,164 @@
 #!/bin/bash
-# In a real life scenario (MAINNET), you need to have your keys under cold storage.
-# We're ok here as we're only playing with TESTNET.
+# Beware this script requires some parts to be run in an air-gapped environment.
+# Failure to do so will prevent the script from running.
 
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=~/pool_topology
+
+# importing utility functions
+source $NS_PATH/utils.sh
 
 echo
-echo '---------------- Generating payment and stake keys / addresses ----------------'
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
 
-cd $HOME
-mkdir -p pool_keys
-cd pool_keys
+read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/2"
+let cnt2="$cnt - $cnt1"
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
 
-echo
-echo '---------------- Generating cold key pair and cold counter certificate ----------------'
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+else
+    echo "ERROR: $ERROR"
+    exit 1
+fi
 
-cardano-cli node key-gen \
---cold-verification-key-file cold.vkey \
---cold-signing-key-file cold.skey \
---operational-certificate-issue-counter-file cold.counter
+IS_AIR_GAPPED=0
+if [[ $NODE_TYPE == "airgap" ]]; then
+    # checking we're in an air-gapped environment
+    if ping -q -c 1 -W 1 google.com >/dev/null; then
+        echo "The network is up"
+    else
+        echo "The network is down"
+    fi
 
-echo
-echo '---------------- Generating VRF key pair ----------------'
+    IS_AIR_GAPPED=$(check_air_gap)
 
-cardano-cli node key-gen-VRF \
---verification-key-file vrf.vkey \
---signing-key-file vrf.skey
+    if [[ $IS_AIR_GAPPED == 1 ]]; then
+        echo "we are air-gapped"
+    else
+        echo "we are online"
+    fi
+fi
 
-echo
-echo '---------------- Generating KES key pair ----------------'
+# getting the script state ready
+STATE_FILE="$HOME/spot.state"
 
-cardano-cli node key-gen-KES \
---verification-key-file kes.vkey \
---signing-key-file kes.skey
+if [ -f "$STATE_FILE" ]; then
+    # Source the state file to restore state
+    . "$STATE_FILE" 2>/dev/null || :
 
-echo
-echo '---------------- Generating the operational certificate ----------------'
+    if [[ $STATE_STEP_ID != 1 && $STATE_SUB_STEP_ID != "completed.trans" ]]; then
+        echo
+        print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
+        echo
+        echo "State file is not as expected. Make sure to complete successfuly the init_stake step first."
+        echo "Bye for now."
+        exit 1
+    else
+        STATE_STEP_ID=2
+        STATE_SUB_STEP_ID="init"
+        STATE_LAST_DATE="never"
+        STATE_TRANS_WORK_DIR=""
+    fi
+else
+    touch $STATE_FILE
+    STATE_STEP_ID=2
+    STATE_SUB_STEP_ID="init"
+    STATE_LAST_DATE="never"
+    STATE_TRANS_WORK_DIR=""
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+fi
 
-SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
-KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
-echo "SLOTSPERKESPERIOD: $SLOTSPERKESPERIOD"
-echo "CTIP: $CTIP"
-echo "KES_PERIOD: $KES_PERIOD"
+print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
 
-cardano-cli node issue-op-cert \
---kes-verification-key-file kes.vkey \
---cold-signing-key-file cold.skey \
---operational-certificate-issue-counter cold.counter \
---kes-period $KES_PERIOD \
---out-file node.cert
+if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "init" ]]; then
+    cd $HOME
+    mkdir -p pool_keys
+    cd pool_keys
 
-echo
-echo '---------------- Moving cold keys to secure storage ----------------'
+    if ! promptyn "Please confirm your bp node is fully synchronized? (y/n)"; then
+        echo "Please sync up your node and rerun init_pool.sh."
+        exit 1
+    fi
+
+    echo
+    echo '---------------- Generating VRF key pair ----------------'
+
+    cardano-cli node key-gen-VRF \
+    --verification-key-file vrf.vkey \
+    --signing-key-file vrf.skey
+
+    chmod 400 vrf.skey
+
+    echo
+    echo '---------------- Generating KES key pair ----------------'
+
+    cardano-cli node key-gen-KES \
+    --verification-key-file kes.vkey \
+    --signing-key-file kes.skey
+
+    chmod 400 kes.skey
+
+    echo
+    echo '---------------- Gathering some information to generate the operational certificate ----------------'
+
+    SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
+    CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+    KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
+    STATE_SUB_STEP_ID="cold.keys"
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR SLOTSPERKESPERIOD CTIP KES_PERIOD
+
+    echo "SLOTSPERKESPERIOD: $SLOTSPERKESPERIOD"
+    echo "CTIP: $CTIP"
+    echo "KES_PERIOD: $KES_PERIOD"
+
+    # copy certain files back to the air-gapped environment to continue operation there
+    STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+    echo
+    echo "Please move the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+    echo $STATE_FILE
+    echo $HOME/pool_keys/kes.vkey
+    echo $STATE_APPLY_SCRIPT
+
+    echo "#!/bin/bash
+mkdir -p $HOME/pool_keys
+mv kes.vkey $HOME/pool_keys
+echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
+fi
+
+if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "cold.keys" ]]; then
+    cd $HOME
+    mkdir -p cold_keys
+    cd cold_keys
+
+    echo
+    echo '---------------- Generating cold key pair and cold counter certificate ----------------'
+
+    cardano-cli node key-gen \
+    --cold-verification-key-file cold.vkey \
+    --cold-signing-key-file cold.skey \
+    --operational-certificate-issue-counter-file cold.counter
+
+    echo
+    echo '---------------- Generating the operational certificate ----------------'
+
+    cardano-cli node issue-op-cert \
+    --kes-verification-key-file kes.vkey \
+    --cold-signing-key-file cold.skey \
+    --operational-certificate-issue-counter cold.counter \
+    --kes-period $KES_PERIOD \
+    --out-file node.cert
+
+    echo
+    echo '---------------- Moving cold keys to secure storage ----------------'
+fi

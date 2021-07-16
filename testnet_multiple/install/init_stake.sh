@@ -61,7 +61,8 @@ else
     STATE_STEP_ID=0
     STATE_SUB_STEP_ID="init"
     STATE_LAST_DATE="never"
-    save_state STATE_STEP_ID STATE_LAST_DATE
+    STATE_TRANS_WORK_DIR=""
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 fi
 
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
@@ -121,7 +122,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 0 ]]; t
     STATE_STEP_ID=1
     STATE_SUB_STEP_ID="build.trans"
     STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
     # make sure path to usb key is set as a global variable and add it to .bashrc
     if [[ -z "$SPOT_USB_KEY" ]]; then
@@ -174,6 +175,8 @@ while [ "$NEXT_STEP_OK" -eq 0 ]; do
         NEXT_STEP_OK=1
     elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
         NEXT_STEP_OK=1
+    elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
+        NEXT_STEP_OK=1
     fi
 done
 
@@ -197,4 +200,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE
 elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our staking address onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/keys/stake.cert
+elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
+    # submiting a transaction to register our staking address onto the blockchain
+    $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
 fi

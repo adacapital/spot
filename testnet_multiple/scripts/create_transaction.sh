@@ -73,7 +73,8 @@ else
     STATE_STEP_ID=0
     STATE_SUB_STEP_ID="build.trans"
     STATE_LAST_DATE="never"
-    save_state STATE_STEP_ID STATE_LAST_DATE
+    STATE_TRANS_WORK_DIR=""
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 fi
 
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
@@ -269,7 +270,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
         STATE_TRANS_WORK_DIR=$CUR_DIR
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
-        # copy certain files to usb key to continue operations on bp node
+        # copy certain files back to the air-gapped environment to continue operation there
         STATE_APPLY_SCRIPT=$HOME/apply_state.sh
         echo
         echo "Please copy the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
@@ -370,10 +371,33 @@ fi
 if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
     echo
     echo '----------------Submitting the transaction... ----------------'
+    
+    CUR_DIR=$STATE_TRANS_WORK_DIR
+    cd $STATE_TRANS_WORK_DIR
+
+    if ! promptyn "Please confirm you want to proceed with sending transaction $STATE_TRANS_WORK_DIR? (y/n)"; then
+        echo "Ok bye!"
+        exit 1
+    fi
+    
     # submit the transaction
-    cardano-cli transaction submit \
-    --tx-file tx.signed \
-    --testnet-magic 1097911063
+    res=$(cardano-cli transaction submit --tx-file tx.signed --testnet-magic 1097911063 2>cli.err)
+
+    if [[ -s $CUR_DIR/cli.err ]]; then
+        echo
+        echo "Warning, the transaction was not submitted, cardano-cli error:"
+        cat $CUR_DIR/cli.err
+    else
+        echo $res
+        echo "Transaction sent!"
+
+        STATE_SUB_STEP_ID="completed.trans"
+        STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+        save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+    fi
+    
+    echo
+    print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
 fi
 
 echo
