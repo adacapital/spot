@@ -294,6 +294,24 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
         --out-file tx.raw \
         --certificate-file $POOL_CERT_FILE \
         --certificate-file $DELEGATION_CERT_FILE
+
+        STATE_SUB_STEP_ID="sign.trans"
+        STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+        STATE_TRANS_WORK_DIR=$CUR_DIR
+        save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+
+        # copy certain files back to the air-gapped environment to continue operation there
+        STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+        echo
+        echo "Please copy the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+        echo $STATE_FILE
+        echo $CUR_DIR/tx.raw
+        echo $STATE_APPLY_SCRIPT
+
+        echo "#!/bin/bash
+mkdir -p $CUR_DIR
+mv tx.raw $CUR_DIR
+echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
     fi
 fi
 

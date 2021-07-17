@@ -68,18 +68,19 @@ if [ -f "$STATE_FILE" ]; then
         echo "State file is not as expected. Make sure to complete successfuly the init_pool step first."
         echo "Bye for now."
         exit 1
+    elif [[ $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "completed" ]]; then
+        STATE_STEP_ID=3
+        STATE_SUB_STEP_ID="init"
+        STATE_LAST_DATE="never"
+        STATE_TRANS_WORK_DIR=""
     elif [[ $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "certificates" ]]; then
         if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
             echo "Warning, to proceed further your environment must be air-gapped."
             echo "Bye for now!"
             exit 1
         fi
-    else
-        STATE_STEP_ID=3
-        STATE_SUB_STEP_ID="init"
-        STATE_LAST_DATE="never"
-        STATE_TRANS_WORK_DIR=""
     fi
+
 else
     touch $STATE_FILE
     STATE_STEP_ID=3

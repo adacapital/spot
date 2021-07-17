@@ -55,7 +55,6 @@ get_topo () {
     #     echo "online"
     # fi
 
-
     if [[ -f "$TOPO_FILE" ]]; then
         if [[ -z "$MY_IP" ]]; then
             NODE_TYPE="airgap"
