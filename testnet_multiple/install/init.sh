@@ -55,7 +55,25 @@ sudo cp $SCRIPT_DIR/config/sysctl.conf /etc/sysctl.conf
 sudo sysctl --system
 sudo systemctl restart chrony
 
-# todo add sshd tweaks
+echo
+echo '---------------- Hardening the vm  ----------------'
+
+# tweaking sshd config
+sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bkp
+sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/g' /etc/ssh/sshd_config
+sudo sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/g' /etc/ssh/sshd_config
+# check new sshd config is correct
+sudo sshd -t 2>sshd.err
+if [[ -s sshd.err ]]; then
+    echo
+    echo "Warning, /etc/ssh/sshd_config is not correct:"
+    cat sshd.err
+    exit 1
+else
+    sudo rm -f sshd.err
+    echo "restarting sshd service"
+    sudo service sshd reload
+fi
 
 echo
 echo '---------------- Installing Cabal ----------------'

@@ -2,84 +2,221 @@
 # In a real life scenario (MAINNET), you need to have your keys under cold storage.
 # We're ok here as we're only playing with TESTNET.
 
-source $HOME/stake-pool-tools/node-scripts/utils.sh
-
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=~/pool_topology
+
+# importing utility functions
+source $NS_PATH/utils.sh
+
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
+
+read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/2"
+let cnt2="$cnt - $cnt1"
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
+
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+else
+    echo "ERROR: $ERROR"
+    exit 1
+fi
+
+IS_AIR_GAPPED=0
+if [[ $NODE_TYPE == "airgap" ]]; then
+    # checking we're in an air-gapped environment
+    if ping -q -c 1 -W 1 google.com >/dev/null; then
+        echo "The network is up"
+    else
+        echo "The network is down"
+    fi
+
+    IS_AIR_GAPPED=$(check_air_gap)
+
+    if [[ $IS_AIR_GAPPED == 1 ]]; then
+        echo "we are air-gapped"
+    else
+        echo "we are online"
+    fi
+fi
+
+# getting the script state ready
+STATE_FILE="$HOME/spot.state"
+
+if [ -f "$STATE_FILE" ]; then
+    # Source the state file to restore state
+    . "$STATE_FILE" 2>/dev/null || :
+
+    if [[ $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID != "completed" ]]; then
+        echo
+        print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
+        echo
+        echo "State file is not as expected. Make sure to complete successfuly the init_pool step first."
+        echo "Bye for now."
+        exit 1
+    elif [[ $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "certificates" ]]; then
+        if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
+            echo "Warning, to proceed further your environment must be air-gapped."
+            echo "Bye for now!"
+            exit 1
+        fi
+    else
+        STATE_STEP_ID=3
+        STATE_SUB_STEP_ID="init"
+        STATE_LAST_DATE="never"
+        STATE_TRANS_WORK_DIR=""
+    fi
+else
+    touch $STATE_FILE
+    STATE_STEP_ID=3
+    STATE_SUB_STEP_ID="init"
+    STATE_LAST_DATE="never"
+    STATE_TRANS_WORK_DIR=""
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+fi
+
+print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
 
 
 cd $HOME/pool_keys
 
-echo
-echo '---------------- Create a JSON file with you testnet pool metadata ----------------'
-# use a url you control (e.g. through your pool's website)
-# here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
-# example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
-GIST_FILE_NAME="adak_testnet.json"
-URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/$GIST_FILE_NAME"
-META_URL="https://git.io/J3SYo"
+if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "init" ]]; then
+    echo
+    echo '---------------- Create a JSON file with you testnet pool metadata ----------------'
+    # use a url you control (e.g. through your pool's website)
+    # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
+    # example: https://gist.githubusercontent.com/adacapital/ad034a7b4fd5a938b64a144101e0d17a/raw/756134a36ff94e6ae6e372f195b5463661bc463d/adak_testnet_multiple.json becomes https://git.io/JW6sJ
+    GIST_FILE_NAME="adak_testnet_multiple.json"
+    URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/ad034a7b4fd5a938b64a144101e0d17a/raw/756134a36ff94e6ae6e372f195b5463661bc463d/$GIST_FILE_NAME"
+    META_URL="https://git.io/JW6sJ"
 
-echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
+    GIST_FILE_NAME=$(prompt_input_default GIST_FILE_NAME $GIST_FILE_NAME)
+    URL_TO_RAW_GIST_FILE=$(prompt_input_default URL_TO_RAW_GIST_FILE $URL_TO_RAW_GIST_FILE)
+    META_URL=$(prompt_input_default META_URL $META_URL)
 
-# download the file from gist
-wget $URL_TO_RAW_GIST_FILE
-# create a hash of your metadata file
-META_DATA_HASH="$(cardano-cli stake-pool metadata-hash --pool-metadata-file $GIST_FILE_NAME)"
-echo "META_DATA_HASH: $META_DATA_HASH"
+    echo
+    echo "Details of your gist file containing the metadata to be used for your pool registration certificate:"
+    echo "GIST_FILE_NAME: $GIST_FILE_NAME"
+    echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
+    echo "META_URL: $META_URL"
+    if ! promptyn "Please confirm you want to proceed? (y/n)"; then
+        echo "Ok bye!"
+        exit 1
+    fi
 
-echo
-echo '---------------- Create a stake pool registration certificate ----------------'
+    # download the file from gist
+    wget $URL_TO_RAW_GIST_FILE
+    # create a hash of your metadata file
+    META_DATA_HASH="$(cardano-cli stake-pool metadata-hash --pool-metadata-file $GIST_FILE_NAME)"
+    echo "META_DATA_HASH: $META_DATA_HASH"
 
-POOL_PLEDGE=$(prompt_input_default POOL_PLEDGE 1000000000)
-MIN_POOL_COST=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
-POOL_COST=$(prompt_input_default POOL_COST $MIN_POOL_COST)
-POOL_MARGIN=$(prompt_input_default POOL_MARGIN 0.03)
+    # getting useful information for next step
+    MIN_POOL_COST=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
+    STATE_SUB_STEP_ID="certificates"
+    STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR META_URL META_DATA_HASH MIN_POOL_COST
 
-echo
-echo "Creating a registration certificate with the following parameters:"
-echo "POOL_PLEDGE: $POOL_PLEDGE"
-echo "POOL_COST: $POOL_COST"
-echo "POOL_MARGIN: $POOL_MARGIN"
-echo "META_URL: $META_URL"
-echo "META_DATA_HASH: $META_DATA_HASH"
-if ! promptyn "Please confirm you want to proceed? (y/n)"; then
-    echo "Ok bye!"
-    exit 1
+    # copy certain files back to the air-gapped environment to continue operation there
+    STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+    echo
+    echo "Please move the following files back to your air-gapped environment in $HOME/cardano and run register_pool.sh."
+    echo $STATE_FILE
+    echo
 fi
 
-cardano-cli stake-pool registration-certificate \
---cold-verification-key-file cold.vkey \
---vrf-verification-key-file vrf.vkey \
---pool-pledge $POOL_PLEDGE \
---pool-cost $POOL_COST \
---pool-margin $POOL_MARGIN \
---pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
---pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
---testnet-magic 1097911063 \
---pool-relay-ipv4 51.104.251.142 \
---pool-relay-port 3001 \
---metadata-url $META_URL \
---metadata-hash $META_DATA_HASH \
---out-file pool-registration.cert
+if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "certificates" ]]; then
+    echo
+    echo '---------------- Create a stake pool registration certificate ----------------'
 
-echo
-echo '---------------- Create a delegation certificate ----------------'
+    POOL_PLEDGE=$(prompt_input_default POOL_PLEDGE 1000000000)
+    POOL_COST=$(prompt_input_default POOL_COST $MIN_POOL_COST)
+    POOL_MARGIN=$(prompt_input_default POOL_MARGIN 0.03)
 
-cardano-cli stake-address delegation-certificate \
---stake-verification-key-file $HOME/keys/stake.vkey \
---cold-verification-key-file cold.vkey \
---out-file delegation.cert
+    echo
+    echo "Creating a registration certificate with the following parameters:"
+    echo "POOL_PLEDGE: $POOL_PLEDGE"
+    echo "POOL_COST: $POOL_COST"
+    echo "POOL_MARGIN: $POOL_MARGIN"
+    echo "META_URL: $META_URL"
+    echo "META_DATA_HASH: $META_DATA_HASH"
+    if ! promptyn "Please confirm you want to proceed? (y/n)"; then
+        echo "Ok bye!"
+        exit 1
+    fi
+
+    cardano-cli stake-pool registration-certificate \
+    --cold-verification-key-file cold.vkey \
+    --vrf-verification-key-file vrf.vkey \
+    --pool-pledge $POOL_PLEDGE \
+    --pool-cost $POOL_COST \
+    --pool-margin $POOL_MARGIN \
+    --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
+    --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
+    --testnet-magic 1097911063 \
+    --pool-relay-ipv4 51.104.251.142 \
+    --pool-relay-port 3001 \
+    --metadata-url $META_URL \
+    --metadata-hash $META_DATA_HASH \
+    --out-file pool-registration.cert
+
+    echo
+    echo '---------------- Create a delegation certificate ----------------'
+
+    cardano-cli stake-address delegation-certificate \
+    --stake-verification-key-file $HOME/keys/stake.vkey \
+    --cold-verification-key-file cold.vkey \
+    --out-file delegation.cert
+fi
+
+NEXT_STEP_OK=0
+while [ "$NEXT_STEP_OK" -eq 0 ]; do
+    read -p "Press enter to continue"
+    # load state
+    . "$STATE_FILE" 2>/dev/null || :
+    print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
+    echo 
+
+    if [[ $STATE_SUB_STEP_ID == "sign.trans" && $IS_AIR_GAPPED == 0 ]]; then
+        echo "Warning, to proceed further your environment must be air-gapped."
+    fi
+
+    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
+        NEXT_STEP_OK=1
+    elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
+        NEXT_STEP_OK=1
+    elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
+        NEXT_STEP_OK=1
+    fi
+done
 
 echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
-# retrieve the stake address deposit parameter
-STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
-echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
+if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
+    # retrieve the stake pool registration deposit parameter
+    STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
+    echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
 
-# create a transaction to register our staking address onto the blockchain
-$NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+    # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
+    # $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
+    # signing a transaction to register our stake pool registration & delegation certificates onto the blockchain
+    $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey
+elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
+    # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
+    $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
 
-# checking that our pool registration was successful
-$NS_PATH/pool_info.sh
+    # checking that our pool registration was successful
+    $NS_PATH/pool_info.sh
+fi

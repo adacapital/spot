@@ -74,11 +74,11 @@ cardano-cli stake-address delegation-certificate \
 echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
-# retrieve the stake address deposit parameter
+# retrieve the stake pool registration deposit parameter
 STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
 echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
 
-# create a transaction to register our staking address onto the blockchain
+# create a transaction to register our stake pool registration & delegation certificates onto the blockchain
 $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
 
 # checking that our pool registration was successful
