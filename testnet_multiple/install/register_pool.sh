@@ -231,6 +231,11 @@ while [ "$NEXT_STEP_OK" -eq 0 ]; do
     print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
     echo 
 
+    IS_AIR_GAPPED=$(check_air_gap)
+    read ERROR NODE_TYPE RELAYS_ < <(get_topo $TOPO_FILE)
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "IS_AIR_GAPPED: $IS_AIR_GAPPED"
+
     if [[ $STATE_SUB_STEP_ID == "sign.trans" && $IS_AIR_GAPPED == 0 ]]; then
         echo "Warning, to proceed further your environment must be air-gapped."
     fi

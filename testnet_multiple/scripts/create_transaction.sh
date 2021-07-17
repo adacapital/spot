@@ -30,10 +30,13 @@ echo '---------------- Reading pool topology file and preparing a few things... 
 read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
-let cnt1="$cnt/2"
-let cnt2="$cnt - $cnt1"
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
 RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
 if [[ $ERROR == "none" ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
@@ -361,6 +364,11 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
             echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
         fi
 
+        NEXT_STEP_SCRIPT="init_stake.sh"
+        if [[ $STATE_STEP_ID == 3 ]]; then
+            NEXT_STEP_SCRIPT="register_pool.sh"
+        fi
+
         # copy certain files to usb key to continue operations on bp node
         cp $STATE_FILE $SPOT_USB_KEY
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
@@ -368,7 +376,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         echo "#!/bin/bash
 mkdir -p $CUR_DIR
 mv tx.signed $CUR_DIR
-echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
+echo \"state applied, please now run $NEXT_STEP_SCRIPT\"" > $STATE_APPLY_SCRIPT
 
         echo
         echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
