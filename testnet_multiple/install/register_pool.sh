@@ -257,7 +257,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
 elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our stake pool registration & delegation certificates onto the blockchain
-    $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey
+    $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey NONE NONE
 elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
     # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
