@@ -364,11 +364,6 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
             echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
         fi
 
-        NEXT_STEP_SCRIPT="init_stake.sh"
-        if [[ $STATE_STEP_ID == 3 ]]; then
-            NEXT_STEP_SCRIPT="register_pool.sh"
-        fi
-
         # copy certain files to usb key to continue operations on bp node
         cp $STATE_FILE $SPOT_USB_KEY
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
@@ -376,7 +371,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         echo "#!/bin/bash
 mkdir -p $CUR_DIR
 mv tx.signed $CUR_DIR
-echo \"state applied, please now run $NEXT_STEP_SCRIPT\"" > $STATE_APPLY_SCRIPT
+echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
         echo
         echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
@@ -391,6 +386,34 @@ echo \"state applied, please now run $NEXT_STEP_SCRIPT\"" > $STATE_APPLY_SCRIPT
         --signing-key-file $COLD_KEY_FILE \
         --testnet-magic 1097911063 \
         --out-file tx.signed
+
+        STATE_SUB_STEP_ID="submit.trans"
+        STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+        save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+
+        # make sure path to usb key is set as a global variable and add it to .bashrc
+        if [[ -z "$SPOT_USB_KEY" ]]; then
+            read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
+        
+            # add it to .bashrc
+            echo $"if [[ -z \$SPOT_USB_KEY ]]; then
+        export SPOT_USB_KEY=$SPOT_USB_KEY
+    fi" >> ~/.bashrc
+            eval "$(cat ~/.bashrc | tail -n +10)"
+            echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
+        fi
+
+        # copy certain files to usb key to continue operations on bp node
+        cp $STATE_FILE $SPOT_USB_KEY
+        cp $CUR_DIR/tx.signed $SPOT_USB_KEY
+        STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
+        echo "#!/bin/bash
+mkdir -p $CUR_DIR
+mv tx.signed $CUR_DIR
+echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+
+        echo
+        echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
     fi
 fi
 
