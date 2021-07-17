@@ -27,7 +27,7 @@ let cnt2="$cnt - $cnt1"
 RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
 RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
 
-if [[ -z $ERROR ]]; then
+if [[ $ERROR == "none" ]]; then
     if [[ $NODE_TYPE == "" ]]; then
         echo "Node type not identified, something went wrong."
         echo "Please fix the underlying issue and run init.sh again."
