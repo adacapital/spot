@@ -12,7 +12,7 @@ echo "SPOT_DIR: $SPOT_DIR"
 echo "NS_PATH: $NS_PATH"
 
 # importing utility functions
-#source $NS_PATH/utils.sh
+source $NS_PATH/utils.sh
 
 # todo, manage air-gapped machine which should only run dependencies installation an exit!
 
@@ -41,8 +41,6 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
-
-exit 1
 
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
