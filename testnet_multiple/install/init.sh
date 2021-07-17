@@ -28,7 +28,7 @@ RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
 RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
 
 if [[ -z $ERROR ]]; then
-    if [[ ! -z $NODE_TYPE ]]; then
+    if [[ $NODE_TYPE == "" ]]; then
         echo "Node type not identified, something went wrong."
         echo "Please fix the underlying issue and run init.sh again."
         exit 1
