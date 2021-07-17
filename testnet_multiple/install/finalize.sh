@@ -70,32 +70,32 @@ echo '---------------- Preparing devops files ----------------'
 sudo apt install bc tcptraceroute curl -y
 
 # installing gLiveView tool for relay node
-# cd ~/node.relay
-# curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
-# curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
-# chmod 755 gLiveView.sh
-
-# sed -i env \
-#     -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.relay\"/g" \
-#     -e "s/CNODE_PORT=6000/CNODE_PORT=3001/g" \
-#     -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
-#     -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
-#     -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
-#     -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
-#     -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
-
-
-# # installing gLiveView tool for bp node
-cd ~/node.bp
+cd ~/node.relay
 curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
 curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
 chmod 755 gLiveView.sh
 
 sed -i env \
-    -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.bp\"/g" \
-    -e "s/CNODE_PORT=6000/CNODE_PORT=3000/g" \
+    -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.relay\"/g" \
+    -e "s/CNODE_PORT=6000/CNODE_PORT=3001/g" \
     -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
     -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
     -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
     -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
     -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
+
+
+# # installing gLiveView tool for bp node
+# cd ~/node.bp
+# curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+# curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+# chmod 755 gLiveView.sh
+
+# sed -i env \
+#     -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.bp\"/g" \
+#     -e "s/CNODE_PORT=6000/CNODE_PORT=3000/g" \
+#     -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
+#     -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
+#     -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
+#     -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
+#     -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
