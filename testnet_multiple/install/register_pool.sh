@@ -231,11 +231,6 @@ while [ "$NEXT_STEP_OK" -eq 0 ]; do
     print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
     echo 
 
-    IS_AIR_GAPPED=$(check_air_gap)
-    read ERROR NODE_TYPE RELAYS_ < <(get_topo $TOPO_FILE)
-    echo "NODE_TYPE: $NODE_TYPE"
-    echo "IS_AIR_GAPPED: $IS_AIR_GAPPED"
-
     if [[ $STATE_SUB_STEP_ID == "sign.trans" && $IS_AIR_GAPPED == 0 ]]; then
         echo "Warning, to proceed further your environment must be air-gapped."
     fi
@@ -267,6 +262,9 @@ elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STA
     # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
 
-    # checking that our pool registration was successful
-    $NS_PATH/pool_info.sh
+    if [[ ! -s $STATE_TRANS_WORK_DIR/cli.err ]]; then
+        echo "toto here $STATE_TRANS_WORK_DIR"
+        # checking that our pool registration was successful
+        $NS_PATH/pool_info.sh
+    fi
 fi
