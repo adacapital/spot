@@ -45,6 +45,7 @@ get_topo () {
     NODE_TYPE="unknown"
     RELAY_IPS=()
     RELAY_NAMES=()
+    RELAY_IPS_PUB=()
     ERROR="none"
     # echo "MY_IP: ${MY_IP}"
 
@@ -54,15 +55,18 @@ get_topo () {
     #     echo "online"
     # fi
 
-    if [[ -z "$MY_IP" ]]; then
-        NODE_TYPE="airgap"
-    elif [[ -f "$TOPO_FILE" ]]; then
-        # echo "Working on topo file..."
+
+    if [[ -f "$TOPO_FILE" ]]; then
+        if [[ -z "$MY_IP" ]]; then
+            NODE_TYPE="airgap"
+        fi
+        
         while IFS= read -r TOPO; do
             # echo $TOPO
             if [[ ! -z $TOPO ]]; then
                 TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
                 TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
+                TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
                 #echo "TOPO_IP: ${TOPO_IP}"
                 #echo "TOPO_NAME: ${TOPO_NAME}"
                 if [[ $TOPO_IP == $MY_IP ]]; then
@@ -75,6 +79,7 @@ get_topo () {
                     if [[ "$TOPO_NAME" == *"relay"* ]]; then
                         RELAY_IPS+=($TOPO_IP)
                         RELAY_NAMES+=($TOPO_NAME)
+                        RELAY_IPS_PUB+=($TOPO_IP_PUB)
                     fi
                 fi
             fi
@@ -87,6 +92,6 @@ get_topo () {
         ERROR="$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
     fi
 
-    echo "$ERROR $NODE_TYPE ${RELAY_IPS[@]} ${RELAY_NAMES[@]}"
+    echo "$ERROR $NODE_TYPE ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
 }
 

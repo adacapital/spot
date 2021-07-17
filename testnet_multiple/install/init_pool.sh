@@ -133,11 +133,13 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 2 && $STATE
     echo
     echo "Please move the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
     echo $STATE_FILE
+    echo $HOME/pool_keys/vrf.vkey
     echo $HOME/pool_keys/kes.vkey
     echo $STATE_APPLY_SCRIPT
 
     echo "#!/bin/bash
 mkdir -p $HOME/pool_keys
+mv vrf.vkey $HOME/pool_keys
 mv kes.vkey $HOME/pool_keys
 echo \"state applied, please now run init_pool.sh\"" > $STATE_APPLY_SCRIPT
 fi

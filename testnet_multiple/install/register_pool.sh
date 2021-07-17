@@ -18,15 +18,19 @@ echo '---------------- Reading pool topology file and preparing a few things... 
 read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
-let cnt1="$cnt/2"
-let cnt2="$cnt - $cnt1"
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
 RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
 if [[ $ERROR == "none" ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
     echo "RELAY_IPS: ${RELAY_IPS[@]}"
     echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
 else
     echo "ERROR: $ERROR"
     exit 1
@@ -85,7 +89,7 @@ else
     save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 fi
 
-print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
+print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
 
 
 cd $HOME/pool_keys
@@ -138,6 +142,15 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     echo
     echo '---------------- Create a stake pool registration certificate ----------------'
 
+    # preparing string with relays public ips and ports
+    RELAYS_COUNT=${#RELAY_IPS_PUB[@]}
+    RELAY_PARAMS=""
+    for (( i=0; i<${RELAYS_COUNT}; i++ ));
+    do
+        RELAY_PARAMS+="--pool-relay-ipv4 ${RELAY_IPS_PUB[$i]} "
+        RELAY_PARAMS+="--pool-relay-port 3001 "
+    done
+
     POOL_PLEDGE=$(prompt_input_default POOL_PLEDGE 1000000000)
     POOL_COST=$(prompt_input_default POOL_COST $MIN_POOL_COST)
     POOL_MARGIN=$(prompt_input_default POOL_MARGIN 0.03)
@@ -149,22 +162,22 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     echo "POOL_MARGIN: $POOL_MARGIN"
     echo "META_URL: $META_URL"
     echo "META_DATA_HASH: $META_DATA_HASH"
+    echo "RELAY_PARAMS: $RELAY_PARAMS"
     if ! promptyn "Please confirm you want to proceed? (y/n)"; then
         echo "Ok bye!"
         exit 1
     fi
 
     cardano-cli stake-pool registration-certificate \
-    --cold-verification-key-file cold.vkey \
-    --vrf-verification-key-file vrf.vkey \
+    --cold-verification-key-file $HOME/cold_keys/cold.vkey \
+    --vrf-verification-key-file $HOME/pool_keys/vrf.vkey \
     --pool-pledge $POOL_PLEDGE \
     --pool-cost $POOL_COST \
     --pool-margin $POOL_MARGIN \
     --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
     --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
     --testnet-magic 1097911063 \
-    --pool-relay-ipv4 51.104.251.142 \
-    --pool-relay-port 3001 \
+    $RELAY_PARAMS \
     --metadata-url $META_URL \
     --metadata-hash $META_DATA_HASH \
     --out-file pool-registration.cert
@@ -174,8 +187,39 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
 
     cardano-cli stake-address delegation-certificate \
     --stake-verification-key-file $HOME/keys/stake.vkey \
-    --cold-verification-key-file cold.vkey \
+    --cold-verification-key-file $HOME/cold_keys/cold.vkey \
     --out-file delegation.cert
+
+    STATE_SUB_STEP_ID="build.trans"
+    STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+
+    # make sure path to usb key is set as a global variable and add it to .bashrc
+    if [[ -z "$SPOT_USB_KEY" ]]; then
+        read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
+    
+        # add it to .bashrc
+        echo $"if [[ -z \$SPOT_USB_KEY ]]; then
+    export SPOT_USB_KEY=$SPOT_USB_KEY
+fi" >> ~/.bashrc
+        eval "$(cat ~/.bashrc | tail -n +10)"
+        echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
+    fi
+
+    # copy certain files to usb key to continue operations on bp node
+    cp $STATE_FILE $SPOT_USB_KEY
+    cp $HOME/pool_keys/pool-registration.cert $SPOT_USB_KEY
+    cp $HOME/pool_keys/delegation.cert $SPOT_USB_KEY
+    STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
+    echo "#!/bin/bash
+mv pool-registration.cert $HOME/pool_keys
+mv delegation.cert $HOME/pool_keys
+chmod 400 $HOME/pool_keys/pool-registration.cert
+chmod 400 $HOME/pool_keys/delegation.cert
+echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+
+    echo
+    echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh, then come back to this prompt..."
 fi
 
 NEXT_STEP_OK=0
