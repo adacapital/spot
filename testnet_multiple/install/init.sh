@@ -11,6 +11,9 @@ echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
 echo "NS_PATH: $NS_PATH"
 
+# importing utility functions
+#source $NS_PATH/utils.sh
+
 # todo, manage air-gapped machine which should only run dependencies installation an exit!
 
 echo
@@ -25,13 +28,21 @@ RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
 RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
 
 if [[ -z $ERROR ]]; then
-    echo "NODE_TYPE: $NODE_TYPE"
-    echo "RELAY_IPS: ${RELAY_IPS[@]}"
-    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    if [[ ! -z $NODE_TYPE ]]; then
+        echo "Node type not identified, something went wrong."
+        echo "Please fix the underlying issue and run init.sh again."
+        exit 1
+    else
+        echo "NODE_TYPE: $NODE_TYPE"
+        echo "RELAY_IPS: ${RELAY_IPS[@]}"
+        echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    fi
 else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+exit 1
 
 echo
 echo '---------------- Keeping vm current with latest security updates ----------------'
@@ -247,6 +258,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     done
 fi
 
+# todo
 # there you need to start one of the relays, let it sync, then tar,move,untar the socket/db dir to all other nodes
 # then you can start the bp node as a relay, then do init_stake etc...
 
