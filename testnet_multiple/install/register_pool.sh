@@ -1,6 +1,6 @@
 #!/bin/bash
-# In a real life scenario (MAINNET), you need to have your keys under cold storage.
-# We're ok here as we're only playing with TESTNET.
+# Beware this script requires some parts to be run in an air-gapped environment.
+# Failure to do so will prevent the script from running.
 
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
