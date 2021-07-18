@@ -1,6 +1,9 @@
 #!/bin/bash
 # This is only relevant for relay nodes.
 
+# forcing .bashrc to be evaluated to setup important environment variables
+eval "$(cat ~/.bashrc | tail -n +10)"
+
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
 NS_PATH="$SPOT_PATH/scripts"
