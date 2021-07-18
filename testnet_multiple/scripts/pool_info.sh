@@ -79,11 +79,12 @@ if [[ -s $HOME/node.bp/pool_info.json ]]; then
 
     STATE_SUB_STEP_ID="get_info"
 else
-    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "init" ]]; then
+    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 ]]; then
         # retrieve pool identifiers
-        POOL_ID_BECH32=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/pool_keys/cold.vkey)
-        POOL_ID_HEX=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/pool_keys/cold.vkey --output-format hex)
+        POOL_ID_BECH32=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey)
+        POOL_ID_HEX=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey --output-format hex)
 
+        STATE_STEP_ID=4
         STATE_SUB_STEP_ID="get_info"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE POOL_ID_BECH32 POOL_ID_HEX
