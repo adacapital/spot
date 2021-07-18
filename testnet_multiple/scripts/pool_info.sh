@@ -15,7 +15,7 @@ source $NS_PATH/utils.sh
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
 
-read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
 let cnt1="$cnt/3"
@@ -79,38 +79,40 @@ if [[ -s $HOME/node.bp/pool_info.json ]]; then
 
     STATE_SUB_STEP_ID="get_info"
 else
-    if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 ]]; then
-        # retrieve pool identifiers
-        POOL_ID_BECH32=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey)
-        POOL_ID_HEX=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey --output-format hex)
+    if [[ $STATE_SUB_STEP_ID != "get_info" ]]; then
+        if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 ]]; then
+            # retrieve pool identifiers
+            POOL_ID_BECH32=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey)
+            POOL_ID_HEX=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/cold_keys/cold.vkey --output-format hex)
 
-        STATE_STEP_ID=4
-        STATE_SUB_STEP_ID="get_info"
-        STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE POOL_ID_BECH32 POOL_ID_HEX
+            STATE_STEP_ID=4
+            STATE_SUB_STEP_ID="get_info"
+            STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+            save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE POOL_ID_BECH32 POOL_ID_HEX
 
-        # make sure path to usb key is set as a global variable and add it to .bashrc
-        if [[ -z "$SPOT_USB_KEY" ]]; then
-            read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
-        
-            # add it to .bashrc
-            echo $"if [[ -z \$SPOT_USB_KEY ]]; then
-        export SPOT_USB_KEY=$SPOT_USB_KEY
-    fi" >> ~/.bashrc
-            eval "$(cat ~/.bashrc | tail -n +10)"
-            echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
+            # make sure path to usb key is set as a global variable and add it to .bashrc
+            if [[ -z "$SPOT_USB_KEY" ]]; then
+                read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
+            
+                # add it to .bashrc
+                echo $"if [[ -z \$SPOT_USB_KEY ]]; then
+            export SPOT_USB_KEY=$SPOT_USB_KEY
+        fi" >> ~/.bashrc
+                eval "$(cat ~/.bashrc | tail -n +10)"
+                echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
+            fi
+
+            # copy certain files to usb key to continue operations on bp node
+            cp $STATE_FILE $SPOT_USB_KEY
+
+            echo
+            echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run pool_info.sh to complete this operation."
+        else
+            echo "This script requires to retrieve pool identifiers from an air-gapped environment as doing make use of cold keys."
+            echo "Please rerun this script from an air-gapped environment."
+            echo "Bye for now!"
+            exit 1
         fi
-
-        # copy certain files to usb key to continue operations on bp node
-        cp $STATE_FILE $SPOT_USB_KEY
-
-        echo
-        echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run pool_info.sh to complete this operation."
-    else
-        echo "This script requires to retrieve pool identifiers from an air-gapped environment as doing make use of cold keys."
-        echo "Please rerun this script from an air-gapped environment."
-        echo "Bye for now!"
-        exit 1
     fi
 fi
 

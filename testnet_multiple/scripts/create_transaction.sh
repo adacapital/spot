@@ -27,7 +27,7 @@ fi
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
 
-read ERROR NODE_TYPE RELAYS < <(get_topo $TOPO_FILE)
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
 let cnt1="$cnt/3"

@@ -43,6 +43,7 @@ get_topo () {
     TOPO_FILE=$1
     MY_IP=$(hostname -I | xargs)
     NODE_TYPE="unknown"
+    BP_IP=""
     RELAY_IPS=()
     RELAY_NAMES=()
     RELAY_IPS_PUB=()
@@ -71,6 +72,7 @@ get_topo () {
                 if [[ $TOPO_IP == $MY_IP ]]; then
                     if [[ "$TOPO_NAME" == *"bp"* ]]; then
                         NODE_TYPE="bp"
+                        BP_IP=$TOPO_IP
                     elif [[ "$TOPO_NAME" == *"relay"* ]]; then
                         NODE_TYPE="relay"
                     fi
@@ -91,6 +93,6 @@ get_topo () {
         ERROR="$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
     fi
 
-    echo "$ERROR $NODE_TYPE ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
+    echo "$ERROR $NODE_TYPE $BP_IP ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
 }
 
