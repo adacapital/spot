@@ -3,9 +3,7 @@
 
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
-SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
-NS_PATH="$SPOT_DIR/scripts"
+NS_PATH="$SPOT_PATH/scripts"
 TOPO_FILE=~/pool_topology
 
 # importing utility functions
