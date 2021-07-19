@@ -66,6 +66,10 @@ EOF
         BLOCKPRODUCING_IP=$BP_IP
         BLOCKPRODUCING_PORT=3000
         MAX_PEERS=20
+
+        echo "BLOCKPRODUCING_IP: $BLOCKPRODUCING_IP"
+        echo "BLOCKPRODUCING_PORT: $BLOCKPRODUCING_PORT"
+        
         # backup existing topology file
         cp $NODE_HOME/config/topology.json $NODE_HOME/config/topology.json.$now
         curl -s -o $NODE_HOME/config/topology.json.new "https://api.clio.one/htopology/v1/fetch/?max=$MAX_PEERS&magic=1097911063&customPeers=$BLOCKPRODUCING_IP:$BLOCKPRODUCING_PORT:1|relays-new.cardano-testnet.iohkdev.io:3001:2"
