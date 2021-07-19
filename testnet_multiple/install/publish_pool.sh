@@ -42,13 +42,19 @@ if [[ $NODE_TYPE == "relay" ]]; then
     # copy topology_updater script to its target directory
     cp $SPOT_PATH/install/topology_updater.sh $NODE_HOME
 
-    # Schedule topology_updater to run every hour
-    # todo check if topology_updater is not already in crontab, if so skip this step
-    cat > $NODE_HOME/crontab-fragment.txt << EOF
+    if [[ $(crontab -l | egrep -v "^(#|$)" | grep -q 'topology_updater'; echo $?) == 1 ]]; then
+        echo "No cron entry found. Adding it."
+
+        # Schedule topology_updater to run every hour
+        # todo check if topology_updater is not already in crontab, if so skip this step
+        cat > $NODE_HOME/crontab-fragment.txt << EOF
 28 * * * * ${NODE_HOME}/topology_updater.sh
 EOF
-    crontab -l | cat - $NODE_HOME/crontab-fragment.txt >$NODE_HOME/crontab.txt && crontab $NODE_HOME/crontab.txt
-    rm $NODE_HOME/crontab-fragment.txt
+        crontab -l | cat - $NODE_HOME/crontab-fragment.txt >$NODE_HOME/crontab.txt && crontab $NODE_HOME/crontab.txt
+        rm $NODE_HOME/crontab-fragment.txt
+    else
+        echo "Cron entry found."
+    fi
 
     # After 4 hours update your relay node topology file
     TOPO_UDT_CNT=$(cat $NODE_HOME/logs/topology_updater_lastresult.json | wc -l)
