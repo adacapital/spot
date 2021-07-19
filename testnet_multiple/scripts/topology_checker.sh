@@ -28,6 +28,21 @@ RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
 RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
 RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
+MY_IP=$(hostname -I | xargs)
+MY_IP_PUB=""
+RELAYS_COUNT=${#RELAY_IPS[@]}
+
+for (( i=0; i<${RELAYS_COUNT}; i++ ));
+do
+    if [[ ${RELAY_IPS[$i]} == MY_IP ]]; then
+        MY_IP_PUB=${RELAY_IPS_PUB[$i]}
+    fi
+done
+
+echo "MY_IP: $MY_IP"
+echo "MY_IP_PUB: $MY_IP_PUB"
+exit 1
+
 if [[ $ERROR == "none" ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
     echo "RELAY_IPS: ${RELAY_IPS[@]}"
