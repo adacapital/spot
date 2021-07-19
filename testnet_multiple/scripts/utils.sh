@@ -69,10 +69,13 @@ get_topo () {
                 TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
                 #echo "TOPO_IP: ${TOPO_IP}"
                 #echo "TOPO_NAME: ${TOPO_NAME}"
+                if [[ $TOPO_NAME == "bp"]]; then:
+                    BP_IP=$TOPO_IP
+                fi
+
                 if [[ $TOPO_IP == $MY_IP ]]; then
                     if [[ "$TOPO_NAME" == *"bp"* ]]; then
                         NODE_TYPE="bp"
-                        BP_IP=$TOPO_IP
                     elif [[ "$TOPO_NAME" == *"relay"* ]]; then
                         NODE_TYPE="relay"
                     fi
