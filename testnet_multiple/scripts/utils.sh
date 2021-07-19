@@ -79,11 +79,12 @@ get_topo () {
                     elif [[ "$TOPO_NAME" == *"relay"* ]]; then
                         NODE_TYPE="relay"
                     fi
-                fi
-                if [[ "$TOPO_NAME" == *"relay"* ]]; then
-                    RELAY_IPS+=($TOPO_IP)
-                    RELAY_NAMES+=($TOPO_NAME)
-                    RELAY_IPS_PUB+=($TOPO_IP_PUB)
+                else
+                    if [[ "$TOPO_NAME" == *"relay"* ]]; then
+                        RELAY_IPS+=($TOPO_IP)
+                        RELAY_NAMES+=($TOPO_NAME)
+                        RELAY_IPS_PUB+=($TOPO_IP_PUB)
+                    fi
                 fi
             fi
         done <$TOPO_FILE
