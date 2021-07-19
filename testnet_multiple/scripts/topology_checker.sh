@@ -52,11 +52,10 @@ do
     fi
 done
 
-BLACKLISTED_RELAYS_IPS_PUB=$MY_IP_PUB
-BLACKLISTED_RELAYS_IPS_PUB=${RELAY_IPS_PUB[@]}
+BLACKLISTED_RELAYS_IPS_PUB=$MY_IP_PUB # your relays are connected to each other 
+# BLACKLISTED_RELAYS_IPS_PUB=${RELAY_IPS_PUB[@]} # your relays are only connected to other pool relays
 
 echo "BLACKLISTED_RELAYS_IPS_PUB: $BLACKLISTED_RELAYS_IPS_PUB"
-exit 1
 
 if [[ $NODE_TYPE == "relay" ]]; then
     # JSON=$WDIR/topology_short.json
