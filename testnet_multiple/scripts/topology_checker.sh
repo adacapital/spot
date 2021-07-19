@@ -32,17 +32,6 @@ MY_IP=$(hostname -I | xargs)
 MY_IP_PUB=""
 RELAYS_COUNT=${#RELAY_IPS[@]}
 
-for (( i=0; i<${RELAYS_COUNT}; i++ ));
-do
-    if [[ ${RELAY_IPS[$i]} == $MY_IP ]]; then
-        MY_IP_PUB=${RELAY_IPS_PUB[$i]}
-    fi
-done
-
-echo "MY_IP: $MY_IP"
-echo "MY_IP_PUB: $MY_IP_PUB"
-exit 1
-
 if [[ $ERROR == "none" ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
     echo "RELAY_IPS: ${RELAY_IPS[@]}"
@@ -52,6 +41,21 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+# define the blacklisted relay ips as the current relay pub ip
+# this can be changed to all your relays if you don't want your relays to be connected to one another
+# simply init BLACKLISTED_RELAYS_IPS_PUB with ${RELAY_IPS_PUB[*]}
+for (( i=0; i<${RELAYS_COUNT}; i++ ));
+do
+    if [[ ${RELAY_IPS[$i]} == $MY_IP ]]; then
+        MY_IP_PUB=${RELAY_IPS_PUB[$i]}
+    fi
+done
+
+BLACKLISTED_RELAYS_IPS_PUB=$MY_IP_PUB
+
+echo "BLACKLISTED_RELAYS_IPS_PUB: $BLACKLISTED_RELAYS_IPS_PUB"
+exit 1
 
 if [[ $NODE_TYPE == "relay" ]]; then
     # JSON=$WDIR/topology_short.json
@@ -76,7 +80,7 @@ if [[ $NODE_TYPE == "relay" ]]; then
     cat $JSON | jq .Producers | jq -M -r '.[] | .addr, .port, .continent, .state' | while read -r ADDR; read -r PORT; read -r CONTINENT; read -r STATE; do
         CHK=$(netcat -w 2 -zv $ADDR $PORT 2>&1)
         if [[ $CHK == *succeeded* ]]; then
-            if echo ${RELAY_IPS_PUB[*]} | grep -q $ADDR; then
+            if echo $BLACKLISTED_RELAYS_IPS_PUB | grep -q $ADDR; then
                 echo "Skipping blacklisted address: $ADDR"
             else
                 echo "Scanning successful: $ADDR $PORT"
