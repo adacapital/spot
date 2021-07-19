@@ -55,6 +55,7 @@ done
 BLACKLISTED_RELAYS_IPS_PUB=$MY_IP_PUB # your relays are connected to each other 
 # BLACKLISTED_RELAYS_IPS_PUB=${RELAY_IPS_PUB[@]} # your relays are only connected to other pool relays
 
+echo "MY_IP_PUB: $MY_IP_PUB"
 echo "BLACKLISTED_RELAYS_IPS_PUB: $BLACKLISTED_RELAYS_IPS_PUB"
 
 if [[ $NODE_TYPE == "relay" ]]; then
