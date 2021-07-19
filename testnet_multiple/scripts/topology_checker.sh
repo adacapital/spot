@@ -34,7 +34,7 @@ RELAYS_COUNT=${#RELAY_IPS[@]}
 
 for (( i=0; i<${RELAYS_COUNT}; i++ ));
 do
-    if [[ ${RELAY_IPS[$i]} == MY_IP ]]; then
+    if [[ ${RELAY_IPS[$i]} == $MY_IP ]]; then
         MY_IP_PUB=${RELAY_IPS_PUB[$i]}
     fi
 done
