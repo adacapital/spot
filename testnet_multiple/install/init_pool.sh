@@ -18,15 +18,19 @@ echo '---------------- Reading pool topology file and preparing a few things... 
 read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
-let cnt1="$cnt/2"
-let cnt2="$cnt - $cnt1"
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
 RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
 if [[ $ERROR == "none" ]]; then
     echo "NODE_TYPE: $NODE_TYPE"
     echo "RELAY_IPS: ${RELAY_IPS[@]}"
     echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
 else
     echo "ERROR: $ERROR"
     exit 1

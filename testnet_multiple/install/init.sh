@@ -22,10 +22,13 @@ echo '---------------- Reading pool topology file and preparing a few things... 
 read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
 RELAYS=($RELAYS)
 cnt=${#RELAYS[@]}
-let cnt1="$cnt/2"
-let cnt2="$cnt - $cnt1"
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
 RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt2}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
 if [[ $ERROR == "none" ]]; then
     if [[ $NODE_TYPE == "" ]]; then
@@ -36,153 +39,154 @@ if [[ $ERROR == "none" ]]; then
         echo "NODE_TYPE: $NODE_TYPE"
         echo "RELAY_IPS: ${RELAY_IPS[@]}"
         echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+            echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
     fi
 else
     echo "ERROR: $ERROR"
     exit 1
 fi
 
-echo
-echo '---------------- Keeping vm current with latest security updates ----------------'
-sudo unattended-upgrade -d
+# echo
+# echo '---------------- Keeping vm current with latest security updates ----------------'
+# sudo unattended-upgrade -d
 
-echo
-echo '---------------- Installing dependencies ----------------'
-sudo apt-get update -y
-sudo apt-get upgrade -y
-sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf -y
-sudo apt-get install bc tcptraceroute curl -y
+# echo
+# echo '---------------- Installing dependencies ----------------'
+# sudo apt-get update -y
+# sudo apt-get upgrade -y
+# sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf -y
+# sudo apt-get install bc tcptraceroute curl -y
 
-echo
-echo '---------------- Tweaking chrony and sysctl configurations ----------------'
-# backuping conf files
-sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$NOW
-sudo cp /etc/sysctl.conf /etc/sysctl.conf.$NOW
-# replacing conf files with our own version
-sudo cp $SCRIPT_DIR/config/chrony.conf /etc/chrony/chrony.conf
-sudo cp $SCRIPT_DIR/config/sysctl.conf /etc/sysctl.conf
-sudo sysctl --system
-sudo systemctl restart chrony
+# echo
+# echo '---------------- Tweaking chrony and sysctl configurations ----------------'
+# # backuping conf files
+# sudo cp /etc/chrony/chrony.conf /etc/chrony/chrony.conf.$NOW
+# sudo cp /etc/sysctl.conf /etc/sysctl.conf.$NOW
+# # replacing conf files with our own version
+# sudo cp $SCRIPT_DIR/config/chrony.conf /etc/chrony/chrony.conf
+# sudo cp $SCRIPT_DIR/config/sysctl.conf /etc/sysctl.conf
+# sudo sysctl --system
+# sudo systemctl restart chrony
 
-echo
-echo '---------------- Hardening the vm  ----------------'
+# echo
+# echo '---------------- Hardening the vm  ----------------'
 
-# tweaking sshd config
-sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bkp
-sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/g' /etc/ssh/sshd_config
-sudo sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/g' /etc/ssh/sshd_config
-# check new sshd config is correct
-sudo sshd -t 2>sshd.err
-if [[ -s sshd.err ]]; then
-    echo
-    echo "Warning, /etc/ssh/sshd_config is not correct:"
-    cat sshd.err
-    exit 1
-else
-    sudo rm -f sshd.err
-    echo "restarting sshd service"
-    sudo service sshd reload
-fi
+# # tweaking sshd config
+# sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bkp
+# sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/g' /etc/ssh/sshd_config
+# sudo sed -i 's/#PermitEmptyPasswords no/PermitEmptyPasswords no/g' /etc/ssh/sshd_config
+# # check new sshd config is correct
+# sudo sshd -t 2>sshd.err
+# if [[ -s sshd.err ]]; then
+#     echo
+#     echo "Warning, /etc/ssh/sshd_config is not correct:"
+#     cat sshd.err
+#     exit 1
+# else
+#     sudo rm -f sshd.err
+#     echo "restarting sshd service"
+#     sudo service sshd reload
+# fi
 
-echo
-echo '---------------- Installing Cabal ----------------'
-# Download most recent version (check this is still the right version here: https://www.haskell.org/cabal/download.html)
-mkdir -p ~/download/cabal
-cd ~/download/cabal
-wget https://downloads.haskell.org/~cabal/cabal-install-3.4.0.0/cabal-install-3.4.0.0-x86_64-ubuntu-16.04.tar.xz
-tar -xf cabal-install-3.4.0.0-x86_64-ubuntu-16.04.tar.xz
-mkdir -p ~/.local/bin
-cp cabal ~/.local/bin/
+# echo
+# echo '---------------- Installing Cabal ----------------'
+# # Download most recent version (check this is still the right version here: https://www.haskell.org/cabal/download.html)
+# mkdir -p ~/download/cabal
+# cd ~/download/cabal
+# wget https://downloads.haskell.org/~cabal/cabal-install-3.4.0.0/cabal-install-3.4.0.0-x86_64-ubuntu-16.04.tar.xz
+# tar -xf cabal-install-3.4.0.0-x86_64-ubuntu-16.04.tar.xz
+# mkdir -p ~/.local/bin
+# cp cabal ~/.local/bin/
 
-# Add $HOME/.local/bin to $PATH and ~/.bashrc if required
-echo "\$PATH Before: $PATH"
-if [[ ! ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
-    echo "\$HOME/.local/bin not found in \$PATH"
-    echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$PATH':" == *":'$HOME'/.local/bin:"* ]]; then
-    export PATH=\$HOME/.local/bin:\$PATH
-fi" >> ~/.bashrc
-    eval "$(cat ~/.bashrc | tail -n +10)"
-else
-    echo "\$HOME/.local/bin found in \$PATH, nothing to change here."
-fi
-echo "\$PATH After: $PATH"
+# # Add $HOME/.local/bin to $PATH and ~/.bashrc if required
+# echo "\$PATH Before: $PATH"
+# if [[ ! ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
+#     echo "\$HOME/.local/bin not found in \$PATH"
+#     echo "Tweaking your .bashrc"
+#     echo $"if [[ ! ":'$PATH':" == *":'$HOME'/.local/bin:"* ]]; then
+#     export PATH=\$HOME/.local/bin:\$PATH
+# fi" >> ~/.bashrc
+#     eval "$(cat ~/.bashrc | tail -n +10)"
+# else
+#     echo "\$HOME/.local/bin found in \$PATH, nothing to change here."
+# fi
+# echo "\$PATH After: $PATH"
 
-echo "Starting: cabal update"
-~/.local/bin/cabal update
-~/.local/bin/cabal user-config update
-sed -i 's/overwrite-policy:/overwrite-policy: always/g' ~/.cabal/config
-cabal --version
-echo "Completed: cabal update"
+# echo "Starting: cabal update"
+# ~/.local/bin/cabal update
+# ~/.local/bin/cabal user-config update
+# sed -i 's/overwrite-policy:/overwrite-policy: always/g' ~/.cabal/config
+# cabal --version
+# echo "Completed: cabal update"
 
-echo
-echo '---------------- Installing GHC ----------------'
-# Download most recent version (check this is still the right version here: https://www.haskell.org/ghc/download.html)
-mkdir -p ~/download/ghc
-cd ~/download/ghc
-wget https://downloads.haskell.org/~ghc/8.10.4/ghc-8.10.4-x86_64-deb9-linux.tar.xz 
-tar -xf ghc-8.10.4-x86_64-deb9-linux.tar.xz 
-cd ghc-8.10.4
-./configure
-sudo make install
-ghc --version
+# echo
+# echo '---------------- Installing GHC ----------------'
+# # Download most recent version (check this is still the right version here: https://www.haskell.org/ghc/download.html)
+# mkdir -p ~/download/ghc
+# cd ~/download/ghc
+# wget https://downloads.haskell.org/~ghc/8.10.4/ghc-8.10.4-x86_64-deb9-linux.tar.xz 
+# tar -xf ghc-8.10.4-x86_64-deb9-linux.tar.xz 
+# cd ghc-8.10.4
+# ./configure
+# sudo make install
+# ghc --version
 
-echo
-echo '---------------- Installing Libsodium ----------------'
-cd ~/download/
-git clone https://github.com/input-output-hk/libsodium
-cd libsodium
-git checkout 66f017f1
-./autogen.sh
-./configure
-make
-sudo make install
+# echo
+# echo '---------------- Installing Libsodium ----------------'
+# cd ~/download/
+# git clone https://github.com/input-output-hk/libsodium
+# cd libsodium
+# git checkout 66f017f1
+# ./autogen.sh
+# ./configure
+# make
+# sudo make install
 
-# Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
-echo "\$LD_LIBRARY_PATH Before: $LD_LIBRARY_PATH"
-if [[ ! ":$LD_LIBRARY_PATH:" == *":/usr/local/lib:"* ]]; then
-    echo "/usr/local/lib not found in \$LD_LIBRARY_PATH"
-    echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$LD_LIBRARY_PATH':" == *":/usr/local/lib:"* ]]; then
-    export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH
-fi" >> ~/.bashrc
-    eval "$(cat ~/.bashrc | tail -n +10)"
-else
-    echo "/usr/local/lib found in \$LD_LIBRARY_PATH, nothing to change here."
-fi
-echo "\$LD_LIBRARY_PATH After: $LD_LIBRARY_PATH"
+# # Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
+# echo "\$LD_LIBRARY_PATH Before: $LD_LIBRARY_PATH"
+# if [[ ! ":$LD_LIBRARY_PATH:" == *":/usr/local/lib:"* ]]; then
+#     echo "/usr/local/lib not found in \$LD_LIBRARY_PATH"
+#     echo "Tweaking your .bashrc"
+#     echo $"if [[ ! ":'$LD_LIBRARY_PATH':" == *":/usr/local/lib:"* ]]; then
+#     export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH
+# fi" >> ~/.bashrc
+#     eval "$(cat ~/.bashrc | tail -n +10)"
+# else
+#     echo "/usr/local/lib found in \$LD_LIBRARY_PATH, nothing to change here."
+# fi
+# echo "\$LD_LIBRARY_PATH After: $LD_LIBRARY_PATH"
 
-# Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
-echo "\$PKG_CONFIG_PATH Before: $PKG_CONFIG_PATH"
-if [[ ! ":$PKG_CONFIG_PATH:" == *":/usr/local/lib/pkgconfig:"* ]]; then
-    echo "/usr/local/lib/pkgconfig not found in \$PKG_CONFIG_PATH"
-    echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$PKG_CONFIG_PATH':" == *":/usr/local/lib/pkgconfig:"* ]]; then
-    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:\$PKG_CONFIG_PATH
-fi" >> ~/.bashrc
-    eval "$(cat ~/.bashrc | tail -n +10)"
-else
-    echo "/usr/local/lib/pkgconfig found in \$PKG_CONFIG_PATH, nothing to change here."
-fi
-echo "\$PKG_CONFIG_PATH After: $PKG_CONFIG_PATH"
+# # Add /usr/local/lib/pkgconfig to $PKG_CONFIG_PATH and ~/.bashrc if required
+# echo "\$PKG_CONFIG_PATH Before: $PKG_CONFIG_PATH"
+# if [[ ! ":$PKG_CONFIG_PATH:" == *":/usr/local/lib/pkgconfig:"* ]]; then
+#     echo "/usr/local/lib/pkgconfig not found in \$PKG_CONFIG_PATH"
+#     echo "Tweaking your .bashrc"
+#     echo $"if [[ ! ":'$PKG_CONFIG_PATH':" == *":/usr/local/lib/pkgconfig:"* ]]; then
+#     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:\$PKG_CONFIG_PATH
+# fi" >> ~/.bashrc
+#     eval "$(cat ~/.bashrc | tail -n +10)"
+# else
+#     echo "/usr/local/lib/pkgconfig found in \$PKG_CONFIG_PATH, nothing to change here."
+# fi
+# echo "\$PKG_CONFIG_PATH After: $PKG_CONFIG_PATH"
 
-if [[ $NODE_TYPE == "bp" ]]; then
-    echo
-    echo '---------------- Building the node from source ----------------'
-    cd ~/download
-    git clone https://github.com/input-output-hk/cardano-node.git
-    cd cardano-node
-    git fetch --all --recurse-submodules --tags
-    git tag
-    LATEST_TAG=$(curl -s https://api.github.com/repos/input-output-hk/cardano-node/releases/latest | jq -r .tag_name)
-    git checkout tags/$LATEST_TAG
-    cabal configure --with-compiler=ghc-8.10.4
-    echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
-    ~/.local/bin/cabal build all
-    cp -p "$($NS_PATH/bin_path.sh cardano-cli)" ~/.local/bin/
-    cp -p "$($NS_PATH/bin_path.sh cardano-node)" ~/.local/bin/
-    cardano-cli --version
-fi
+# if [[ $NODE_TYPE == "bp" ]]; then
+#     echo
+#     echo '---------------- Building the node from source ----------------'
+#     cd ~/download
+#     git clone https://github.com/input-output-hk/cardano-node.git
+#     cd cardano-node
+#     git fetch --all --recurse-submodules --tags
+#     git tag
+#     LATEST_TAG=$(curl -s https://api.github.com/repos/input-output-hk/cardano-node/releases/latest | jq -r .tag_name)
+#     git checkout tags/$LATEST_TAG
+#     cabal configure --with-compiler=ghc-8.10.4
+#     echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
+#     ~/.local/bin/cabal build all
+#     cp -p "$($NS_PATH/bin_path.sh cardano-cli)" ~/.local/bin/
+#     cp -p "$($NS_PATH/bin_path.sh cardano-node)" ~/.local/bin/
+#     cardano-cli --version
+# fi
 
 echo
 echo '---------------- Preparing topology, genesis and config files ----------------'
@@ -191,19 +195,52 @@ if [[ $NODE_TYPE == "relay" ]]; then
     NODE_DIR="node.relay"
 fi
 
-mkdir -p ~/$NODE_DIR/config
-mkdir -p ~/$NODE_DIR/socket
-mkdir -p ~/$NODE_DIR/logs
-cd ~/$NODE_DIR/config
-wget -O config.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-config.json
-wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-byron-genesis.json
-wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-shelley-genesis.json
-wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-topology.json
-sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json
-sed -i 's/testnet-byron-genesis/bgenesis/g' config.json
-sed -i 's/testnet-shelley-genesis/sgenesis/g' config.json
+# mkdir -p ~/$NODE_DIR/config
+# mkdir -p ~/$NODE_DIR/socket
+# mkdir -p ~/$NODE_DIR/logs
+# cd ~/$NODE_DIR/config
+# wget -O config.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-config.json
+# wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-byron-genesis.json
+# wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-shelley-genesis.json
+# wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-topology.json
+# sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json
+# sed -i 's/testnet-byron-genesis/bgenesis/g' config.json
+# sed -i 's/testnet-shelley-genesis/sgenesis/g' config.json
 
-# todo upgrade sed commands to match target config currently set in node.relay and node.bp folders
+# # todo upgrade sed commands to match target config.jsonb currently set in node.relay and node.bp folders
+
+# building topology.json
+if [[ $NODE_TYPE == "bp" ]]; then
+    RELAYS_COUNT=${#RELAY_IPS[@]}
+    RELAYS_JSON=$HOME/$NODE_DIR/config/relays.json
+
+    for (( i=0; i<${RELAYS_COUNT}; i++ ));
+    do
+        echo -e "{\n \"addr\": \"${RELAY_IPS[$i]}\",\n \"port\": 3001,\n \"valency\": 1\n}," >> $RELAYS_JSON
+    done
+
+    echo -e "{ \n\"Producers\": [\n$(cat $RELAYS_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
+
+    rm -f $RELAYS_JSON
+elif [[ $NODE_TYPE == "relay" ]]; then
+    cp $HOME/$NODE_DIR/config/topology.json $HOME/$NODE_DIR/config/topology.json.bak
+    JSON=$HOME/$NODE_DIR/config/topology.json.bak
+    TMP_JSON=$HOME/$NODE_DIR/config/tmp.json
+
+    # adding reference to bp node
+    echo -e "{\n \"addr\": \"$BP_IP\",\n \"port\": 3000,\n \"valency\": 1\n}," >> $TMP_JSON
+
+    # adding references to default iohk relays listed in the default iohk topology file
+    cat $JSON | jq .Producers | jq -M -r '.[] | .addr, .port, .valency' | while read -r ADDR; read -r PORT; read -r VALENCY; do
+        echo -e "{\n \"addr\": \"$ADDR\",\n \"port\": $PORT,\n \"valency\": $VALENCY\n}," >> $TMP_JSON
+    done
+
+    echo -e "{ \n\"Producers\": [\n$(cat $TMP_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
+
+    rm -f $JSON $TMP_JSON
+fi
+
+exit 1
 
 # setting up important environment variables
 
