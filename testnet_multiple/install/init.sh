@@ -170,6 +170,7 @@ fi
 # fi
 # echo "\$PKG_CONFIG_PATH After: $PKG_CONFIG_PATH"
 
+# # building cardano binaries from bp node
 # if [[ $NODE_TYPE == "bp" ]]; then
 #     echo
 #     echo '---------------- Building the node from source ----------------'
@@ -188,12 +189,12 @@ fi
 #     cardano-cli --version
 # fi
 
-echo
-echo '---------------- Preparing topology, genesis and config files ----------------'
-NODE_DIR="node.bp"
-if [[ $NODE_TYPE == "relay" ]]; then
-    NODE_DIR="node.relay"
-fi
+# echo
+# echo '---------------- Preparing topology, genesis and config files ----------------'
+# NODE_DIR="node.bp"
+# if [[ $NODE_TYPE == "relay" ]]; then
+#     NODE_DIR="node.relay"
+# fi
 
 # mkdir -p ~/$NODE_DIR/config
 # mkdir -p ~/$NODE_DIR/socket
@@ -209,93 +210,237 @@ fi
 
 # # todo upgrade sed commands to match target config.jsonb currently set in node.relay and node.bp folders
 
-# building topology.json
+# # building topology.json
+# if [[ $NODE_TYPE == "bp" ]]; then
+#     RELAYS_COUNT=${#RELAY_IPS[@]}
+#     RELAYS_JSON=$HOME/$NODE_DIR/config/relays.json
+
+#     for (( i=0; i<${RELAYS_COUNT}; i++ ));
+#     do
+#         echo -e "{\n \"addr\": \"${RELAY_IPS[$i]}\",\n \"port\": 3001,\n \"valency\": 1\n}," >> $RELAYS_JSON
+#     done
+
+#     echo -e "{ \n\"Producers\": [\n$(cat $RELAYS_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
+
+#     rm -f $RELAYS_JSON
+# elif [[ $NODE_TYPE == "relay" ]]; then
+#     cp $HOME/$NODE_DIR/config/topology.json $HOME/$NODE_DIR/config/topology.json.bak
+#     JSON=$HOME/$NODE_DIR/config/topology.json.bak
+#     TMP_JSON=$HOME/$NODE_DIR/config/tmp.json
+
+#     # adding reference to bp node
+#     echo -e "{\n \"addr\": \"$BP_IP\",\n \"port\": 3000,\n \"valency\": 1\n}," >> $TMP_JSON
+
+#     # adding references to default iohk relays listed in the default iohk topology file
+#     cat $JSON | jq .Producers | jq -M -r '.[] | .addr, .port, .valency' | while read -r ADDR; read -r PORT; read -r VALENCY; do
+#         echo -e "{\n \"addr\": \"$ADDR\",\n \"port\": $PORT,\n \"valency\": $VALENCY\n}," >> $TMP_JSON
+#     done
+
+#     echo -e "{ \n\"Producers\": [\n$(cat $TMP_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
+
+#     rm -f $JSON $TMP_JSON
+# fi
+
+# exit 1
+
+# # setting up important environment variables
+
+# echo "\$CARDANO_NODE_SOCKET_PATH Before: $CARDANO_NODE_SOCKET_PATH"
+# if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/$NODE_DIR/socket:"* ]]; then
+#     echo "\$HOME/$NODE_DIR/socket not found in \$CARDANO_NODE_SOCKET_PATH"
+#     echo "Tweaking your .bashrc"
+#     echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/$NODE_DIR/socket:"* ]]; then
+#     export CARDANO_NODE_SOCKET_PATH=\$HOME/$NODE_DIR/socket/node.socket
+# fi" >> ~/.bashrc
+#     eval "$(cat ~/.bashrc | tail -n +10)"
+# else
+#     echo "\$HOME/$NODE_DIR/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
+# fi
+# echo "\$CARDANO_NODE_SOCKET_PATH After: $CARDANO_NODE_SOCKET_PATH"
+
+# if [[ ! ":$SPOT_PATH:" == *":$SPOT_DIR:"* ]]; then
+#     echo "\$SPOT_DIR not found in \$SPOT_PATH"
+#     echo "Tweaking your .bashrc"
+#     echo $"if [[ ! ":'$SPOT_PATH':" == *":$SPOT_DIR:"* ]]; then
+#     export SPOT_PATH=$SPOT_DIR
+# fi" >> ~/.bashrc
+#     eval "$(cat ~/.bashrc | tail -n +10)"
+# else
+#     echo "\$SPOT_DIR found in \$SPOT_PATH, nothing to change here."
+# fi
+# echo "\$SPOT_PATH After: $SPOT_PATH"
+
+# # copying cardano binaries to relay nodes and other important files
+# if [[ $NODE_TYPE == "bp" ]]; then
+#     echo
+#     echo '---------------- Getting other peers ready... ----------------'
+
+#     RELAYS_COUNT=${#RELAY_IPS[@]}
+
+#     for (( i=0; i<${RELAYS_COUNT}; i++ ));
+#     do
+#         echo "Checking ${RELAY_IPS[$i]} is online..."
+#         ping -c1 -W1 -q ${RELAY_IPS[$i]} &>/dev/null
+#         status=$( echo $? )
+#         if [[ $status == 0 ]] ; then
+#             echo "Online"
+#             echo '---------------- Copying pool_topology file... ----------------'
+#             scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/pool_topology cardano@${RELAY_IPS[$i]}:/home/cardano
+#             echo '---------------- Copying cardano binaries... ----------------'
+#             ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'mkdir -p ~/.local/bin'
+#             scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
+#         else
+#             echo "Offline"
+#         fi
+#     done
+# fi
+
+# # preparing the node starting script
+# if [[ $NODE_TYPE == "relay" ]]; then
+#     cp $SPOT_PATH/install/run.relay.sh $HOME/node.relay
+# elif [[ $NODE_TYPE == "bp" ]]; then
+#     # the bp node starting script is identical to a relay to start with, it will be customized later on once the pool gets registered
+#     cp $SPOT_PATH/install/run.relay.sh $HOME/node.bp/run.bp.sh
+#     sed -i 's/node.relay/node.bp/g' $HOME/node.bp/run.bp.sh
+#     sed -i 's/port 3001/port 3000/g' $HOME/node.bp/run.bp.sh
+# fi
+
+# # getting all node's socket db ready
+# echo "Please now start ${RELAY_NAMES[0]} (${RELAY_IPS[0]}) and wait until it is fully synchronized."
+# echo
+
+# if [[ $NODE_TYPE == "bp" ]]; then
+#     NEXT_STEP_OK=0
+#     while [ "$NEXT_STEP_OK" -eq 0 ]; do
+#         if ! promptyn "Please confirm ${RELAY_NAMES[0]} (${RELAY_IPS[0]}) is fully synchronized? (y/n)"; then
+#             echo "Ok let's wait some more"
+#         else
+#             NEXT_STEP_OK=1
+#         fi
+#     done
+
+#     # tar socket db on the synchronized relay
+#     echo "Preparing a tar file of socket db..."
+#     ssh -i ~/.ssh/${RELAY_NAMES[0]}.pem cardano@${RELAY_IPS[0]} 'tar -czvf /home/cardano/node.relay/relay.db.tar.gz /home/cardano/node.relay/db/'
+#     echo "Preparing the bp node's socket db..."
+#     scp -i ~/.ssh/${RELAY_NAMES[0]}.pem cardano@${RELAY_IPS[0]}:/home/cardano/node.relay/relay.db.tar.gz $HOME/node.bp
+
+#     # copy & untar socket db tar file to all relay nodes
+#     RELAYS_COUNT=${#RELAY_IPS[@]}
+
+#     for (( i=1; i<${RELAYS_COUNT}; i++ ));
+#     do
+#         echo "Copying socket db to ${RELAY_NAMES[i]} (${RELAY_IPS[i]})..."
+#         scp -i ~/.ssh/${RELAY_NAMES[i]}.pem $HOME/node.bp/relay.db.tar.gz cardano@${RELAY_IPS[i]}:/home/cardano/node.relay
+#         echo "Getting socket db ready for ${RELAY_NAMES[i]} (${RELAY_IPS[i]})..."
+#         ssh -i ~/.ssh/${RELAY_NAMES[i]}.pem cardano@${RELAY_IPS[i]} 'tar -xzvf /home/cardano/node.relay/relay.db.tar.gz'  
+#     done
+
+#     # untar socket db tar file on bp node
+#     echo "Getting socket db ready for the bp node..."
+#     tar -xzvf /home/cardano/node.relay/relay.db.tar.gz
+# fi
+
+echo
+echo '---------------- Getting our node systemd services ready ----------------'
+
+if [[ $NODE_TYPE == "relay" ]]; then
+    cat > $HOME/node.relay/run.relay.service << EOF
+[Unit]
+Description=Cardano Relay Node Run Script
+Wants=network-online.target
+After=multi-user.target
+
+[Service]
+User=$USER
+Type=simple
+WorkingDirectory=$HOME/node.relay
+Restart=always
+RestartSec=5
+LimitNOFILE=131072
+ExecStart=/bin/bash -c '$HOME/node.relay/run.relay.sh'
+KillSignal=SIGINT
+RestartKillSignal=SIGINT
+TimeoutStopSec=2
+SuccessExitStatus=143
+SyslogIdentifier=run.relay
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo mv $HOME/node.relay/run.relay.service /etc/systemd/system/run.relay.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable run.relay
+fi
+
 if [[ $NODE_TYPE == "bp" ]]; then
-    RELAYS_COUNT=${#RELAY_IPS[@]}
-    RELAYS_JSON=$HOME/$NODE_DIR/config/relays.json
+    cat > $HOME/node.bp/run.bp.service << EOF
+[Unit]
+Description=Cardano BP Node Run Script
+Wants=network-online.target
+After=multi-user.target
 
-    for (( i=0; i<${RELAYS_COUNT}; i++ ));
-    do
-        echo -e "{\n \"addr\": \"${RELAY_IPS[$i]}\",\n \"port\": 3001,\n \"valency\": 1\n}," >> $RELAYS_JSON
-    done
+[Service]
+User=$USER
+Type=simple
+WorkingDirectory=$HOME/node.bp
+Restart=always
+RestartSec=5
+LimitNOFILE=131072
+ExecStart=/bin/bash -c '$HOME/node.bp/run.bp.sh'
+KillSignal=SIGINT
+RestartKillSignal=SIGINT
+TimeoutStopSec=2
+SuccessExitStatus=143
+SyslogIdentifier=run.bp
 
-    echo -e "{ \n\"Producers\": [\n$(cat $RELAYS_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
-
-    rm -f $RELAYS_JSON
-elif [[ $NODE_TYPE == "relay" ]]; then
-    cp $HOME/$NODE_DIR/config/topology.json $HOME/$NODE_DIR/config/topology.json.bak
-    JSON=$HOME/$NODE_DIR/config/topology.json.bak
-    TMP_JSON=$HOME/$NODE_DIR/config/tmp.json
-
-    # adding reference to bp node
-    echo -e "{\n \"addr\": \"$BP_IP\",\n \"port\": 3000,\n \"valency\": 1\n}," >> $TMP_JSON
-
-    # adding references to default iohk relays listed in the default iohk topology file
-    cat $JSON | jq .Producers | jq -M -r '.[] | .addr, .port, .valency' | while read -r ADDR; read -r PORT; read -r VALENCY; do
-        echo -e "{\n \"addr\": \"$ADDR\",\n \"port\": $PORT,\n \"valency\": $VALENCY\n}," >> $TMP_JSON
-    done
-
-    echo -e "{ \n\"Producers\": [\n$(cat $TMP_JSON | head -n -1)} ]}" | jq . > $HOME/$NODE_DIR/config/topology.json
-
-    rm -f $JSON $TMP_JSON
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo mv $HOME/node.bp/run.bp.service /etc/systemd/system/run.bp.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable run.bp
 fi
 
-exit 1
+# echo
+# echo '---------------- Preparing devops files ----------------'
 
-# setting up important environment variables
+# sudo apt install bc tcptraceroute curl -y
 
-echo "\$CARDANO_NODE_SOCKET_PATH Before: $CARDANO_NODE_SOCKET_PATH"
-if [[ ! ":$CARDANO_NODE_SOCKET_PATH:" == *":$HOME/$NODE_DIR/socket:"* ]]; then
-    echo "\$HOME/$NODE_DIR/socket not found in \$CARDANO_NODE_SOCKET_PATH"
-    echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$CARDANO_NODE_SOCKET_PATH':" == *":'$HOME'/$NODE_DIR/socket:"* ]]; then
-    export CARDANO_NODE_SOCKET_PATH=\$HOME/$NODE_DIR/socket/node.socket
-fi" >> ~/.bashrc
-    eval "$(cat ~/.bashrc | tail -n +10)"
-else
-    echo "\$HOME/$NODE_DIR/socket found in \$CARDANO_NODE_SOCKET_PATH, nothing to change here."
-fi
-echo "\$CARDANO_NODE_SOCKET_PATH After: $CARDANO_NODE_SOCKET_PATH"
+# # installing gLiveView tool for relay node
+# if [[ $NODE_TYPE == "relay" ]]; then
+#     cd $HOME/node.relay
+#     curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+#     curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+#     chmod 755 gLiveView.sh
 
-if [[ ! ":$SPOT_PATH:" == *":$SPOT_DIR:"* ]]; then
-    echo "\$SPOT_DIR not found in \$SPOT_PATH"
-    echo "Tweaking your .bashrc"
-    echo $"if [[ ! ":'$SPOT_PATH':" == *":$SPOT_DIR:"* ]]; then
-    export SPOT_PATH=$SPOT_DIR
-fi" >> ~/.bashrc
-    eval "$(cat ~/.bashrc | tail -n +10)"
-else
-    echo "\$SPOT_DIR found in \$SPOT_PATH, nothing to change here."
-fi
-echo "\$SPOT_PATH After: $SPOT_PATH"
+#     sed -i env \
+#         -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.relay\"/g" \
+#         -e "s/CNODE_PORT=6000/CNODE_PORT=3001/g" \
+#         -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
+#         -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
+#         -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
+#         -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
+#         -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
+# fi
 
-if [[ $NODE_TYPE == "bp" ]]; then
-    echo
-    echo '---------------- Getting other peers ready... ----------------'
+# # installing gLiveView tool for bp node
+# if [[ $NODE_TYPE == "bp" ]]; then
+#     cd $HOME/node.bp
+#     curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+#     curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+#     chmod 755 gLiveView.sh
 
-    RELAYS_COUNT=${#RELAY_IPS[@]}
-
-    for (( i=0; i<${RELAYS_COUNT}; i++ ));
-    do
-        echo "Checking ${RELAY_IPS[$i]} is online..."
-        ping -c1 -W1 -q ${RELAY_IPS[$i]} &>/dev/null
-        status=$( echo $? )
-        if [[ $status == 0 ]] ; then
-            echo "Online"
-            echo '---------------- Copying pool_topology file... ----------------'
-            scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/pool_topology cardano@${RELAY_IPS[$i]}:/home/cardano
-            echo '---------------- Copying cardano binaries... ----------------'
-            ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'mkdir -p ~/.local/bin'
-            scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
-        else
-            echo "Offline"
-        fi
-    done
-fi
-
-# todo
-# there you need to start one of the relays, let it sync, then tar,move,untar the socket/db dir to all other nodes
-# then you can start the bp node as a relay, then do init_stake etc...
+#     sed -i env \
+#         -e "s/\#CNODE_HOME=\"\/opt\/cardano\/cnode\"/CNODE_HOME=\"\$\{HOME\}\/node.bp\"/g" \
+#         -e "s/CNODE_PORT=6000/CNODE_PORT=3000/g" \
+#         -e "s/\#CONFIG=\"\${CNODE_HOME}\/files\/config.json\"/CONFIG=\"\${CNODE_HOME}\/config\/config.json\"/g" \
+#         -e "s/\#SOCKET=\"\${CNODE_HOME}\/sockets\/node0.socket\"/SOCKET=\"\${CNODE_HOME}\/socket\/node.socket\"/g" \
+#         -e "s/\#TOPOLOGY=\"\${CNODE_HOME}\/files\/topology.json\"/TOPOLOGY=\"\${CNODE_HOME}\/config\/topology.json\"/g" \
+#         -e "s/\#LOG_DIR=\"\${CNODE_HOME}\/logs\"/LOG_DIR=\"\${CNODE_HOME}\/logs\"/g" \
+#         -e "s/\#DB_DIR=\"\${CNODE_HOME}\/db\"/DB_DIR=\"\${CNODE_HOME}\/db\"/g"
+# fi
 
 echo "INIT SCRIPT COMPLETED."
 
