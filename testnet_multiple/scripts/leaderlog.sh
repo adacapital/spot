@@ -45,8 +45,9 @@ if [[ $NODE_TYPE == "bp" ]]; then
     EPOCH="${1:-next}"
     TIMEZONE="${2:-UTC}"
     POOL_ID=$(cat $HOME/node.bp/pool_info.json | jq -r .pool_id_hex)
-    # echo $EPOCH
-    # echo $TIMEZONE
+    echo "EPOCH: $EPOCH"
+    echo "TIMEZONE: $TIMEZONE"
+    echo "POOL_ID: $POOL_ID"
 
     function getLeader() {
         /usr/local/bin/cncli leaderlog \
