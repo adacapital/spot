@@ -7,6 +7,7 @@
 **/terraform.tfstate.*
 **/terraform.tfstate
 **/.terraform.tfstate.lock.info
+**/terraform.tfvars
 **/.terraform.lock.hcl
 **/*.plan
 **/*.pem
