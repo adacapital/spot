@@ -97,13 +97,13 @@ cd $HOME/pool_keys
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "init" ]]; then
     echo
-    echo '---------------- Create a JSON file with you testnet pool metadata ----------------'
+    echo '---------------- Create a JSON file with you mainnet pool metadata ----------------'
     # use a url you control (e.g. through your pool's website)
     # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
-    # example: https://gist.githubusercontent.com/adacapital/ad034a7b4fd5a938b64a144101e0d17a/raw/756134a36ff94e6ae6e372f195b5463661bc463d/adak_testnet_multiple.json becomes https://git.io/JW6sJ
-    GIST_FILE_NAME="adak_testnet_multiple.json"
-    URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/ad034a7b4fd5a938b64a144101e0d17a/raw/756134a36ff94e6ae6e372f195b5463661bc463d/$GIST_FILE_NAME"
-    META_URL="https://git.io/JW6sJ"
+    # example: https://gist.githubusercontent.com/adacapital/581ae5434e59c79743b8c644a452de95/raw/073c12d0799156cd492feeb0cbba9d887a5e8b54/adact_mainnet.json becomes https://git.io/JEMjI
+    GIST_FILE_NAME="adact_mainnet.json"
+    URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/581ae5434e59c79743b8c644a452de95/raw/073c12d0799156cd492feeb0cbba9d887a5e8b54/$GIST_FILE_NAME"
+    META_URL="https://git.io/JEMjI"
 
     GIST_FILE_NAME=$(prompt_input_default GIST_FILE_NAME $GIST_FILE_NAME)
     URL_TO_RAW_GIST_FILE=$(prompt_input_default URL_TO_RAW_GIST_FILE $URL_TO_RAW_GIST_FILE)
@@ -177,7 +177,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     --pool-margin $POOL_MARGIN \
     --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
     --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
-    --testnet-magic 1097911063 \
+    --mainnet \
     $RELAY_PARAMS \
     --metadata-url $META_URL \
     --metadata-hash $META_DATA_HASH \

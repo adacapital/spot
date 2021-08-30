@@ -72,7 +72,7 @@ EOF
         
         # backup existing topology file
         cp $NODE_HOME/config/topology.json $NODE_HOME/config/topology.json.$now
-        curl -s -o $NODE_HOME/config/topology.json.new "https://api.clio.one/htopology/v1/fetch/?max=$MAX_PEERS&magic=1097911063&customPeers=$BLOCKPRODUCING_IP:$BLOCKPRODUCING_PORT:1|relays-new.cardano-testnet.iohkdev.io:3001:2"
+        curl -s -o $NODE_HOME/config/topology.json.new "https://api.clio.one/htopology/v1/fetch/?max=$MAX_PEERS&magic=764824073&customPeers=$BLOCKPRODUCING_IP:$BLOCKPRODUCING_PORT:1|relays-new.cardano-mainnet.iohk.io:3001:2"
 
         echo "{ \"Producers\": $(cat node.relay/config/topology.json.new | jq .Producers) }" > $NODE_HOME/config/topology.json
 

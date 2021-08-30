@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# curl -s https://explorer.mainnet.cardano.org/relays/topology.json | grep 51.104.251.142
-
-echo -e "\nChecking pool referenced in testnet topology:"
-curl -s https://explorer.cardano-testnet.iohkdev.io/relays/topology.json | grep 51.104.251.142
+echo -e "\nChecking pool referenced in mainnet topology:"
+curl -s https://explorer.cardano.org/relays/topology.json | grep 51.104.251.142
 
 echo -e "\nChecking prometheus metrics for relay:"
 curl -s http://127.0.0.1:12798/metrics | sort

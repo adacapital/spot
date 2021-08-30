@@ -101,7 +101,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 0 ]]; t
     cardano-cli stake-address build \
     --stake-verification-key-file stake.vkey \
     --out-file stake.addr \
-    --testnet-magic 1097911063
+    --mainnet
 
     chmod 400 stake.addr
 
@@ -110,7 +110,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 0 ]]; t
     --payment-verification-key-file payment.vkey \
     --stake-verification-key-file stake.vkey \
     --out-file paymentwithstake.addr \
-    --testnet-magic 1097911063
+    --mainnet
 
     chmod 400 paymentwithstake.addr
 
@@ -189,7 +189,7 @@ echo '---------------- Registering staking adddress ----------------'
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
     # retrieve the stake address deposit parameter
-    STAKE_ADDRESS_DEPOSIT=$(cardano-cli query protocol-parameters --testnet-magic 1097911063 | jq -r '.stakeAddressDeposit')
+    STAKE_ADDRESS_DEPOSIT=$(cardano-cli query protocol-parameters --mainnet | jq -r '.stakeAddressDeposit')
     echo "STAKE_ADDRESS_DEPOSIT: $STAKE_ADDRESS_DEPOSIT"
 
     # making sure paymentwithstake.addr is funded
