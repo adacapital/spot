@@ -9,6 +9,7 @@
 **/.terraform.tfstate.lock.info
 **/.terraform.lock.hcl
 **/*.plan
+**/*.pem
 **/output/
 **/*-aks-flux/
 
