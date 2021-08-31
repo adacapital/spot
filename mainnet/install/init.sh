@@ -207,7 +207,7 @@ cd ~/$NODE_DIR/config
 
 # prepare config.json
 
-LINENO_SOURCE=$(grep -in defaultBackends $HOME/node.bp/config/config.json | awk -F: '{print $1}')
+LINENO_SOURCE=$(grep -in defaultBackends config.json | awk -F: '{print $1}')
 LINENO_TEMPLATE=$(grep -in defaultBackends $HOME/spot/mainnet/install/config/config_template.json | awk -F: '{print $1}')
 
 head -$(expr $LINENO_SOURCE - 1) config.json > config.json.tmp
