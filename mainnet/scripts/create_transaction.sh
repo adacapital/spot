@@ -110,11 +110,11 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     CUR_DIR=`pwd`
 
     # get protocol parameters
-    cardano-cli query protocol-parameters --testnet-magic 1097911063 --out-file protocol.json
+    cardano-cli query protocol-parameters --mainnet --out-file protocol.json
 
     # determine the TTL (Time To Live) for the transaction
     # CTIP : the current tip of the blockchain
-    CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+    CTIP=$(cardano-cli query tip --mainnet | jq -r .slot)
     TTL=$(expr $CTIP + 1200)
 
     echo "CTIP: $CTIP"
@@ -214,7 +214,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     --tx-out-count ${TXOCNT} \
     --witness-count ${WITCNT} \
     --byron-witness-count 0 \
-    --testnet-magic 1097911063 \
+    --mainnet \
     --protocol-params-file protocol.json | awk '{print $1}')
 
     UTXO_LOVELACE_BALANCE_FINAL=$(expr $TOTAL_BALANCE - $LOVELACE_AMOUNT - $FEE)
@@ -336,7 +336,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         cardano-cli transaction sign \
         --tx-body-file tx.raw \
         --signing-key-file $SKEY_FILE \
-        --testnet-magic 1097911063 \
+        --mainnet \
         --out-file tx.signed
     elif [[ $WITCNT -eq 2 ]]; then
         echo "Signing the transaction with two witnesses"
@@ -345,7 +345,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         --tx-body-file tx.raw \
         --signing-key-file $SKEY_FILE \
         --signing-key-file $SKEY_FILE_STAKE \
-        --testnet-magic 1097911063 \
+        --mainnet \
         --out-file tx.signed
 
         STATE_SUB_STEP_ID="submit.trans"
@@ -384,7 +384,7 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
         --signing-key-file $SKEY_FILE \
         --signing-key-file $SKEY_FILE_STAKE \
         --signing-key-file $COLD_KEY_FILE \
-        --testnet-magic 1097911063 \
+        --mainnet \
         --out-file tx.signed
 
         STATE_SUB_STEP_ID="submit.trans"
@@ -430,7 +430,7 @@ if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
     fi
     
     # submit the transaction
-    res=$(cardano-cli transaction submit --tx-file tx.signed --testnet-magic 1097911063 2>cli.err)
+    res=$(cardano-cli transaction submit --tx-file tx.signed --mainnet 2>cli.err)
 
     if [[ -s $CUR_DIR/cli.err ]]; then
         echo

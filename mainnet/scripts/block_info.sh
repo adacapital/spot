@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BLOCK_INFO_JSON=$(curl -sd '{"network_identifier": { "blockchain": "cardano", "network": "testnet" }, "block_identifier": {}}' -H "Content-Type: application/json" https://explorer.cardano-testnet.iohkdev.io/rosetta/block)
+BLOCK_INFO_JSON=$(curl -sd '{"network_identifier": { "blockchain": "cardano", "network": "mainnet" }, "block_identifier": {}}' -H "Content-Type: application/json" https://explorer.cardano.org/rosetta/block)
 
 EPOCH_NO=$(echo $BLOCK_INFO_JSON | jq .block.metadata.epochNo)
 SLOT_NO=$(echo $BLOCK_INFO_JSON | jq .block.metadata.slotNo)

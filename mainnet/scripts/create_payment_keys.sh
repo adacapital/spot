@@ -18,6 +18,6 @@ chmod 400 $1.vkey $1.skey
 cardano-cli address build \
 --payment-verification-key-file $1.vkey \
 --out-file $1.addr \
---testnet-magic 1097911063
+--mainnet
 
 chmod 400 $1.addr

@@ -123,7 +123,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 2 && $STATE
     echo '---------------- Gathering some information to generate the operational certificate ----------------'
 
     SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-    CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+    CTIP=$(cardano-cli query tip --mainnet | jq -r .slot)
     KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
     STATE_SUB_STEP_ID="cold.keys"
     save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR SLOTSPERKESPERIOD CTIP KES_PERIOD

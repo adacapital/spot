@@ -72,7 +72,7 @@ if [[ $NODE_TYPE == "relay" ]]; then
     rm -f $SCAN_FILE_SUCCESS $SCAN_FILE_FAIL $SCAN_FILE_REPORT
 
     # download official relays tolopology filee
-    curl -s https://explorer.cardano-testnet.iohkdev.io/relays/topology.json > $JSON
+    curl -s https://explorer.cardano.org/relays/topology.json > $JSON
 
     # initialize SCAN_FILE_SUCCESS with our BP node
     echo -e "{\n \"addr\": \"$BLOCKPRODUCING_IP\",\n \"port\": $BLOCKPRODUCING_PORT,\n \"valency\": 1\n}," >> $SCAN_FILE_SUCCESS
@@ -86,7 +86,7 @@ if [[ $NODE_TYPE == "relay" ]]; then
             else
                 echo "Scanning successful: $ADDR $PORT"
                 VALENCY=1
-                if [[ $ADDR == "relays-new.cardano-testnet.iohkdev.io" ]]; then VALENCY=2; fi
+                if [[ $ADDR == "relays-new.cardano-mainnet.iohk.io" ]]; then VALENCY=2; fi
                 echo -e "{\n \"addr\": \"$ADDR\",\n \"port\": $PORT,\n \"valency\": $VALENCY,\n \"continent\": \"$CONTINENT\",\n \"state\": \"$STATE\"\n}," >> $SCAN_FILE_SUCCESS
                 SCAN_CT_SUCCESS=`expr $SCAN_CT_SUCCESS + 1`
             fi
