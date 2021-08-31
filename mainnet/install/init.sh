@@ -212,7 +212,7 @@ LINENO_TEMPLATE=$(grep -in defaultBackends $HOME/spot/mainnet/install/config/con
 
 head -$(expr $LINENO_SOURCE - 1) config.json > config.json.tmp
 tail +$LINENO_TEMPLATE $HOME/spot/mainnet/install/config/config_template.json >> config.json.tmp
-sed -i 's/"TraceBlockFetchClient": false,/"MaxConcurrencyDeadline": 4,\n\  "TraceBlockFetchClient": false,/g' $HOME/node.bp/config/config.json.tmp
+sed -i 's/"TraceBlockFetchClient": false,/"MaxConcurrencyDeadline": 4,\n\  "TraceBlockFetchClient": false,/g' config.json.tmp
 
 sed -i 's/"TraceBlockFetchClient": false/"TraceBlockFetchClient": true/g' config.json.tmp
 sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json.tmp
