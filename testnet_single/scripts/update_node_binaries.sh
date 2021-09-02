@@ -16,6 +16,6 @@ cabal clean
 cabal update
 cabal build all
 
-cp -p "$(./bin_path.sh cardano-cli)" ~/.local/bin/
-cp -p "$(./bin_path.sh cardano-node)" ~/.local/bin/
+cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-cli)" ~/.local/bin/
+cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-node)" ~/.local/bin/
 cardano-cli --version
