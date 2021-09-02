@@ -213,34 +213,47 @@ LINENO_TEMPLATE=$(grep -in defaultBackends $HOME/spot/mainnet/install/config/con
 
 head -$(expr $LINENO_SOURCE - 1) config.json > config.json.tmp
 tail +$LINENO_TEMPLATE $HOME/spot/mainnet/install/config/config_template.json >> config.json.tmp
-sed -i 's/"TraceBlockFetchClient": false,/"MaxConcurrencyDeadline": 4,\n\  "TraceBlockFetchClient": false,/g' config.json.tmp
 
-sed -i 's/"TraceBlockFetchClient": false/"TraceBlockFetchClient": true/g' config.json.tmp
-sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json.tmp
-sed -i 's/"TraceBlockFetchProtocol": false/"TraceBlockFetchProtocol": true/g' config.json.tmp
-sed -i 's/"TraceBlockFetchProtocolSerialised": false/"TraceBlockFetchProtocolSerialised": true/g' config.json.tmp
-sed -i 's/"TraceChainSyncBlockServer": false/"TraceChainSyncBlockServer": true/g' config.json.tmp
-sed -i 's/"TraceBlockFetchServer": false/"TraceBlockFetchServer": true/g' config.json.tmp
-sed -i 's/"TraceChainSyncClient": false/"TraceChainSyncClient": true/g' config.json.tmp
-sed -i 's/"TraceChainSyncHeaderServer": false/"TraceChainSyncHeaderServer": true/g' config.json.tmp
-sed -i 's/"TraceChainSyncProtocol": false/"TraceChainSyncProtocol": true/g' config.json.tmp
-sed -i 's/"TraceConnectionManager": true/"TraceConnectionManager": false/g' config.json.tmp
-sed -i 's/"TraceDiffusionInitialization": true/"TraceDiffusionInitialization": false/g' config.json.tmp
-sed -i 's/"TraceHandshake": false/"TraceHandshake": true/g' config.json.tmp
-sed -i 's/"TraceInboundGovernor": true/"TraceInboundGovernor": false/g' config.json.tmp
-sed -i 's/"TraceLedgerPeers": true/"TraceLedgerPeers": false/g' config.json.tmp
-sed -i 's/"TraceLocalChainSyncProtocol": false/"TraceLocalChainSyncProtocol": true/g' config.json.tmp
-sed -i 's/"TraceLocalRootPeers": true/"TraceLocalRootPeers": false/g' config.json.tmp
-sed -i 's/"TraceLocalTxSubmissionProtocol": false/"TraceLocalTxSubmissionProtocol": true/g' config.json.tmp
-sed -i 's/"TraceLocalTxSubmissionServer": false/"TraceLocalTxSubmissionServer": true/g' config.json.tmp
-sed -i 's/"TracePeerSelection": true/"TracePeerSelection": false/g' config.json.tmp
-sed -i 's/"TracePeerSelectionActions": true/"TracePeerSelectionActions": false/g' config.json.tmp
-sed -i 's/"TracePublicRootPeers": true/"TracePublicRootPeers": false/g' config.json.tmp
-sed -i 's/"TraceServer": true/"TraceServer": false/g' config.json.tmp
-sed -i 's/"TraceTxInbound": false/"TraceTxInbound": true/g' config.json.tmp
-sed -i 's/"TraceTxOutbound": false/"TraceTxOutbound": true/g' config.json.tmp
-sed -i 's/"TraceLocalTxSubmissionServer": false/"TraceLocalTxSubmissionServer": true/g' config.json.tmp
-sed -i 's/"TraceTxSubmissionProtocol": false/"TraceTxSubmissionProtocol": true/g' config.json.tmp
+sed -i 's/"TraceBlockFetchClient": false,/"MaxConcurrencyDeadline": 4,\n\  "TraceBlockFetchClient": false,/g' config.json.tmp
+sed -I 's/"TraceBlockFetchClient": true,/"TraceBlockFetchClient": false,/g' config.json.tmp
+sed -I 's/"TraceBlockFetchDecisions": true,/"TraceBlockFetchDecisions": false,/g' config.json.tmp
+sed -I 's/"TraceBlockFetchProtocol": true,/"TraceBlockFetchProtocol": false,/g' config.json.tmp
+sed -I 's/"TraceBlockFetchProtocolSerialised": true,/"TraceBlockFetchProtocolSerialised": false,/g' config.json.tmp
+sed -I 's/"TraceBlockFetchServer": true,/"TraceBlockFetchServer": false,/g' config.json.tmp
+sed -I 's/"TraceChainDb": true,/"TraceChainDb": true,/g' config.json.tmp
+sed -I 's/"TraceChainSyncBlockServer": true,/"TraceChainSyncBlockServer": false,/g' config.json.tmp
+sed -I 's/"TraceChainSyncClient": true,/"TraceChainSyncClient": false,/g' config.json.tmp
+sed -I 's/"TraceChainSyncHeaderServer": true,/"TraceChainSyncHeaderServer": false,/g' config.json.tmp
+sed -I 's/"TraceChainSyncProtocol": true,/"TraceChainSyncProtocol": false,/g' config.json.tmp
+sed -I 's/"TraceConnectionManager": false,/"TraceConnectionManager": false,/g' config.json.tmp
+sed -I 's/"TraceDNSResolver": true,/"TraceDNSResolver": false,/g' config.json.tmp
+sed -I 's/"TraceDNSSubscription": true,/"TraceDNSSubscription": false,/g' config.json.tmp
+sed -I 's/"TraceDiffusionInitialization": false,/"TraceDiffusionInitialization": false,/g' config.json.tmp
+sed -I 's/"TraceErrorPolicy": true,/"TraceErrorPolicy": false,/g' config.json.tmp
+sed -I 's/"TraceForge": true,/"TraceForge": false,/g' config.json.tmp
+sed -I 's/"TraceHandshake": true,/"TraceHandshake": false,/g' config.json.tmp
+sed -I 's/"TraceInboundGovernor": false,/"TraceInboundGovernor": false,/g' config.json.tmp
+sed -I 's/"TraceIpSubscription": true,/"TraceIpSubscription": false,/g' config.json.tmp
+sed -I 's/"TraceLedgerPeers": false,/"TraceLedgerPeers": false,/g' config.json.tmp
+sed -I 's/"TraceLocalChainSyncProtocol": true,/"TraceLocalChainSyncProtocol": false,/g' config.json.tmp
+sed -I 's/"TraceLocalErrorPolicy": true,/"TraceLocalErrorPolicy": false,/g' config.json.tmp
+sed -I 's/"TraceLocalHandshake": false,/"TraceLocalHandshake": false,/g' config.json.tmp
+sed -I 's/"TraceLocalRootPeers": false,/"TraceLocalRootPeers": false,/g' config.json.tmp
+sed -I 's/"TraceLocalTxSubmissionProtocol": true,/"TraceLocalTxSubmissionProtocol": false,/g' config.json.tmp
+sed -I 's/"TraceLocalTxSubmissionServer": true,/"TraceLocalTxSubmissionServer": false,/g' config.json.tmp
+sed -I 's/"TraceMempool": true,/"TraceMempool": true,/g' config.json.tmp
+sed -I 's/"TraceMux": false,/"TraceMux": false,/g' config.json.tmp
+sed -I 's/"TracePeerSelection": false,/"TracePeerSelection": false,/g' config.json.tmp
+sed -I 's/"TracePeerSelectionActions": false,/"TracePeerSelectionActions": false,/g' config.json.tmp
+sed -I 's/"TracePublicRootPeers": false,/"TracePublicRootPeers": false,/g' config.json.tmp
+sed -I 's/"TraceServer": false,/"TraceServer": false,/g' config.json.tmp
+sed -I 's/"TraceTxInbound": true,/"TraceTxInbound": true,/g' config.json.tmp
+sed -I 's/"TraceTxOutbound": true,/"TraceTxOutbound": true,/g' config.json.tmp
+sed -I 's/"TraceTxSubmissionProtocol": true,/"TraceTxSubmissionProtocol": true,/g' config.json.tmp
+sed -I 's/"TracingVerbosity": "NormalVerbosity",/"TracingVerbosity": "NormalVerbosity",/g' config.json.tmp
+sed -I 's/"TurnOnLogMetrics": true/"TurnOnLogMetrics": true,/g' config.json.tmp
+sed -I 's/"TurnOnLogging": true,/"TurnOnLogging": true,/g' config.json.tmp
+
 sed -i 's/mainnet-byron-genesis/bgenesis/g' config.json.tmp
 sed -i 's/mainnet-shelley-genesis/sgenesis/g' config.json.tmp
 sed -i 's/mainnet-alonzo-genesis/agenesis/g' config.json.tmp
