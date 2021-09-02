@@ -1,39 +1,78 @@
 #!/bin/bash
 # Only relevant for block producing node
 
-NOW=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
-CNCLI_STATUS=$($NS_PATH/cncli_status.sh | jq -r .status)
-EPOCH="${1:-next}"
-TIMEZONE="${2:-UTC}"
-POOL_ID=$(cat $HOME/node.bp/pool_info.json | jq -r .pool_id_hex)
-# echo $EPOCH
-# echo $TIMEZONE
-
 if [[ $1 == "--help" || $1 == "--h" ]]; then 
-    echo "help"; 
     echo -e "Usage: $0 {epoch [prev, current, next]; default:next} {timezone; default:UTC}"
     exit 2
 fi
 
-function getLeader() {
-    /usr/local/bin/cncli leaderlog \
-        --db $HOME/node.bp/cncli/cncli.db \
-        --pool-id  $POOL_ID \
-        --pool-vrf-skey $HOME/pool_keys/vrf.skey \
-        --byron-genesis $HOME/node.bp/config/bgenesis.json \
-        --shelley-genesis $HOME/node.bp/config/sgenesis.json \
-        --ledger-set $EPOCH \
-        --ledger-state $HOME/node.bp/ledger-state.json \
-        --tz $TIMEZONE
-}
+# global variables
+NOW=`date +"%Y%m%d_%H%M%S"`
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=~/pool_topology
 
-if [[ $CNCLI_STATUS == "ok" ]]; then
-    echo "CNCLI database is synced."
-    mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
-    getLeader > $HOME/node.bp/cncli/leaderlog.json
-    # remove leaderlogs older than 15 days
-    find $HOME/node.bp/cncli/. -name "leaderlog.*.json" -mtime +15 -exec rm -f '{}' \;
+# importing utility functions
+source $NS_PATH/utils.sh
+
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
+
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
+
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
 else
-    echo "CNCLI database not synced!!!"
+    echo "ERROR: $ERROR"
+    exit 1
+fi
+
+if [[ $NODE_TYPE == "bp" ]]; then
+    CNCLI_STATUS=$($NS_PATH/cncli_status.sh | jq -r .status)
+    EPOCH="${1:-next}"
+    TIMEZONE="${2:-UTC}"
+    POOL_ID=$(cat $HOME/node.bp/pool_info.json | jq -r .pool_id_hex)
+    echo "EPOCH: $EPOCH"
+    echo "TIMEZONE: $TIMEZONE"
+    echo "POOL_ID: $POOL_ID"
+
+    function getLeader() {
+        /usr/local/bin/cncli leaderlog \
+            --db $HOME/node.bp/cncli/cncli.db \
+            --pool-id  $POOL_ID \
+            --pool-vrf-skey $HOME/pool_keys/vrf.skey \
+            --byron-genesis $HOME/node.bp/config/bgenesis.json \
+            --shelley-genesis $HOME/node.bp/config/sgenesis.json \
+            --ledger-set $EPOCH \
+            --ledger-state $HOME/node.bp/ledger-state.json \
+            --tz $TIMEZONE
+    }
+
+    if [[ $CNCLI_STATUS == "ok" ]]; then
+        echo "CNCLI database is synced."
+        mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
+        getLeader > $HOME/node.bp/cncli/leaderlog.json
+
+        echo "leaderlog produced: $HOME/node.bp/cncli/leaderlog.json"
+
+        # remove leaderlogs older than 15 days
+        find $HOME/node.bp/cncli/. -name "leaderlog.*.json" -mtime +15 -exec rm -f '{}' \;
+    else
+        echo "CNCLI database not synced!!!"
+    fi
+else
+    echo "You should only install cncli on your BP node."
 fi
