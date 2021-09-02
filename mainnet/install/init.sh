@@ -203,6 +203,7 @@ cd ~/$NODE_DIR/config
 wget -O config.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-config.json
 # wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-byron-genesis.json
 # wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-shelley-genesis.json
+wget -O agenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-alonzo-genesis.json
 # wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-topology.json
 
 # prepare config.json
@@ -242,6 +243,7 @@ sed -i 's/"TraceLocalTxSubmissionServer": false/"TraceLocalTxSubmissionServer": 
 sed -i 's/"TraceTxSubmissionProtocol": false/"TraceTxSubmissionProtocol": true/g' config.json.tmp
 sed -i 's/mainnet-byron-genesis/bgenesis/g' config.json.tmp
 sed -i 's/mainnet-shelley-genesis/sgenesis/g' config.json.tmp
+sed -i 's/mainnet-alonzo-genesis/agenesis/g' config.json.tmp
 
 if [[ $NODE_TYPE == "bp" ]]; then
     sed -i 's/node.relay/node.bp/g' config.json.tmp
