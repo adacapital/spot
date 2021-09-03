@@ -29,7 +29,7 @@
   "TraceDNSSubscription": false,
   "TraceDiffusionInitialization": false,
   "TraceErrorPolicy": false,
-  "TraceForge": false,
+  "TraceForge": true,
   "TraceHandshake": false,
   "TraceInboundGovernor": false,
   "TraceIpSubscription": false,
