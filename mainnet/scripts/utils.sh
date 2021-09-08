@@ -63,7 +63,7 @@ get_topo () {
         
         while IFS= read -r TOPO; do
             # echo $TOPO
-            if [[ ! -z $TOPO ]]; then
+            if [[ ! -z $TOPO && ! $TOPO == \#* ]]; then
                 TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
                 TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
                 TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
