@@ -1,40 +1,58 @@
 #!/bin/bash
 TOPO_FILE=~/pool_topology
 MY_IP=$(hostname -I | xargs)
-NODE_TYPE=""
-RELAYS=()
-echo "MY_IP: ${MY_IP}"
+    NODE_TYPE="unknown"
+    BP_IP=""
+    RELAY_IPS=()
+    RELAY_NAMES=()
+    RELAY_IPS_PUB=()
+    ERROR="none"
+    # echo "MY_IP: ${MY_IP}"
 
-if [[ -f "$TOPO_FILE" ]]; then
-    echo "Working on topo file..."
-    while IFS= read -r TOPO; do
-        echo $TOPO
-        if [[ ! -z $TOPO ]]; then
-            TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
-            TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
-            #echo "TOPO_IP: ${TOPO_IP}"
-            #echo "TOPO_NAME: ${TOPO_NAME}"
-            if [[ $TOPO_IP == $MY_IP ]]; then
-                if [[ "$TOPO_NAME" == *"bp"* ]]; then
-                    NODE_TYPE="bp"
-                elif [[ "$TOPO_NAME" == *"relay"* ]]; then
-                    NODE_TYPE="relay"
+    # if [[ -z "$MY_IP" ]]; then
+    #     echo "air-gap!"
+    # else
+    #     echo "online"
+    # fi
+
+    if [[ -f "$TOPO_FILE" ]]; then
+        if [[ -z "$MY_IP" ]]; then
+            NODE_TYPE="airgap"
+        fi
+        
+        while IFS= read -r TOPO; do
+            echo $TOPO
+            if [[ ! -z $TOPO && ! $TOPO == \#* ]]; then
+                TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
+                TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
+                TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
+                #echo "TOPO_IP: ${TOPO_IP}"
+                #echo "TOPO_NAME: ${TOPO_NAME}"
+                if [[ $TOPO_NAME == "bp" ]]; then
+                    BP_IP=$TOPO_IP
                 fi
-            else
+
+                if [[ $TOPO_IP == $MY_IP ]]; then
+                    if [[ "$TOPO_NAME" == *"bp"* ]]; then
+                        NODE_TYPE="bp"
+                    elif [[ "$TOPO_NAME" == *"relay"* ]]; then
+                        NODE_TYPE="relay"
+                    fi
+                fi
                 if [[ "$TOPO_NAME" == *"relay"* ]]; then
-                    RELAYS+=($TOPO_IP)
+                    RELAY_IPS+=($TOPO_IP)
+                    RELAY_NAMES+=($TOPO_NAME)
+                    RELAY_IPS_PUB+=($TOPO_IP_PUB)
                 fi
             fi
-        fi
-    done <$TOPO_FILE
+        done <$TOPO_FILE
 
-    echo "NODE_TYPE: $NODE_TYPE"
-    echo "RELAYS: ${RELAYS[@]}"
-    echo "RELAYS length: ${#RELAYS[@]}"
-else 
-    echo "$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
-    exit 1
-fi
+        echo "NODE_TYPE: $NODE_TYPE"
+        echo "RELAY_IPS: ${RELAY_IPS[@]}"
+        echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    else 
+        ERROR="$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
+    fi
 
 exit 1
 
