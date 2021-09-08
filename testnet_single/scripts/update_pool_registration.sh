@@ -2,12 +2,20 @@
 # In a real life scenario (MAINNET), you need to have your keys under cold storage.
 # We're ok here as we're only playing with TESTNET.
 
-source $HOME/stake-pool-tools/node-scripts/utils.sh
-
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+NOW=`date +"%Y%m%d_%H%M%S"`
+TOPO_FILE=~/pool_topology
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
 
+echo "UPDATE POOL REGISTRATION STARTING..."
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "NS_PATH: $NS_PATH"
+
+# importing utility functions
+source $NS_PATH/utils.sh
 
 cd $HOME/pool_keys
 
@@ -74,12 +82,8 @@ cardano-cli stake-address delegation-certificate \
 echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
-# retrieve the stake pool registration deposit parameter
-STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
-echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
-
 # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-$NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+$NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) 0 $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
 
 # checking that our pool registration was successful
 $NS_PATH/pool_info.sh
