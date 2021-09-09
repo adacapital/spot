@@ -89,6 +89,16 @@ else
 fi
 
 echo
+echo '---------------- Setting up swap file  ----------------'
+# todo
+# as root, edit /etc/waagent.conf:
+#ResourceDisk.Format=y
+#ResourceDisk.EnableSwap=y
+#ResourceDisk.SwapSizeMB=14336 for bp, 3072 for relay
+#service walinuxagent restart
+#check with swapon -s
+
+echo
 echo '---------------- Installing Cabal ----------------'
 # Download most recent version (check this is still the right version here: https://www.haskell.org/cabal/download.html)
 mkdir -p ~/download/cabal
