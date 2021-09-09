@@ -11,7 +11,7 @@ NS_PATH="$SPOT_DIR/scripts"
 cd $HOME
 cd pool_keys
 
-if [ -f "$HOME/pool_keys/kes.vkey" ]; then
+if [ -f "$HOME/pool_keys/kes.skey" ]; then
     echo
     echo '---------------- Backing up previous KES key pair ----------------'
     chmod 664 $HOME/pool_keys/kes.vkey
