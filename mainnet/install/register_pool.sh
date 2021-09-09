@@ -263,8 +263,15 @@ elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STA
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
 
     if [[ ! -s $STATE_TRANS_WORK_DIR/cli.err ]]; then
-        echo "toto here $STATE_TRANS_WORK_DIR"
-        # checking that our pool registration was successful
-        $NS_PATH/pool_info.sh
+        echo "Submitting the transaction to register our pool was a success!"
+
+        echo "Finalizing the bp startup script..."
+        cp $SPOT_DIR/install/run.bp.sh $HOME/node.bp
+
+        echo "Please stop and start node bp."
+        echo
+        
+        echo "Let's check that we can find our pool in the blockchain."
+        echo "Todo so please return to your airgap environment and run scripts/pool_info.sh"
     fi
 fi
