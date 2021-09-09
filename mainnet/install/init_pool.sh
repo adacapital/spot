@@ -136,6 +136,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 2 && $STATE
     STATE_APPLY_SCRIPT=$HOME/apply_state.sh
     echo
     echo "Please move the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+    echo "Then don't forget delete the below vkey files from your bp node."
     echo $STATE_FILE
     echo $HOME/pool_keys/vrf.vkey
     echo $HOME/pool_keys/kes.vkey
