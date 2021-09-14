@@ -118,7 +118,10 @@ fi
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "get_info" ]]; then
     # retrieve the pool delegation state
-    REG_JSON=$(cardano-cli query ledger-state --mainnet | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
+    # beware this as of 2021.09.09 requires at least 14gig swap + 8gig ram
+    # todo, replace with cncli stake-snapshot to be less memory intensive
+    cardano-cli query ledger-state --mainnet > $HOME/ledger-state.json
+    REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
 
     # retrieve the pool's stake distribution and rank
     STAKE_DIST=$(cardano-cli query stake-distribution --mainnet | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)

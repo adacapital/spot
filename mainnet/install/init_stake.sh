@@ -160,6 +160,10 @@ else
         echo "[Install State] script: init_stake, step: $STATE_STEP_ID, generating payment key and stake key/address"
         echo "Error: cannot proceed, the environment is not air gapped."
         exit 1
+    elif [[ $NODE_TYPE != "airgap" && $STATE_STEP_ID == 0 ]]; then
+        echo "[Install State] script: init_stake, step: $STATE_STEP_ID, generating payment key and stake key/address"
+        echo "Error: cannot proceed, the environment is not air gapped."
+        exit 1
     fi
 fi
 

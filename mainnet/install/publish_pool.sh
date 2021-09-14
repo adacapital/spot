@@ -76,8 +76,11 @@ EOF
 
         echo "{ \"Producers\": $(cat node.relay/config/topology.json.new | jq .Producers) }" > $NODE_HOME/config/topology.json
 
-        # restart relay node
-        # sudo systemctl restart cardano-node
+        echo "Topology candidate:"
+        cat $NODE_HOME/config/topology.json.new
+
+        echo "Restarting the relay..."
+        sudo systemctl restart run.relay
     else
         HOURS=`expr 4 - $TOPO_UDT_CNT`
         echo "Another $HOURS hour(s) to wait before the relay topology file can be updated!"
