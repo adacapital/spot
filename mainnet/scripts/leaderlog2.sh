@@ -66,7 +66,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     if [[ $CNCLI_STATUS == "ok" ]]; then
         echo "CNCLI database is synced."
 
-        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic 1097911063)
+        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --mainnet)
 
         if [[ $EPOCH == "next" ]]; then
             POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeMark": )\d+(?=,?)')
