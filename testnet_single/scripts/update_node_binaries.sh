@@ -23,8 +23,10 @@ cd ~/download/cardano-node
 git fetch --all --tags
 git checkout "tags/$1"
 
+echo
 git describe --tags
 
+echo
 if ! promptyn "Is this the correct tag? (y/n)"; then
     echo "Ok bye!"
     exit 1
@@ -34,6 +36,26 @@ cabal clean
 cabal update
 cabal build all
 
+echo
+if ! promptyn "Build complete, ready to stop/restart services? (y/n)"; then
+    echo "Ok bye!"
+    exit 1
+fi
+
+echo
+echo '---------------- Stopping node services ---------------- '
+sudo systemctl stop cncli-sync
+sudo systemctl stop run.relay
+sudo systemctl stop run.bp
+
 cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-cli)" ~/.local/bin/
 cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-node)" ~/.local/bin/
 cardano-cli --version
+
+echo
+echo '---------------- Starting node services ---------------- '
+sudo systemctl start run.relay
+sudo systemctl start run.bp
+sudo systemctl start cncli-sync
+
+echo 'Node binaries update completed!'
