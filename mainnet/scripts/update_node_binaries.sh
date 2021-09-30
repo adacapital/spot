@@ -131,4 +131,6 @@ if [[ $NODE_TYPE == "bp" ]]; then
 
     echo
     echo 'Node binaries update complete!'
+else
+    echo "Node binaries update should be run from the BP node! Bye for now..."
 fi
