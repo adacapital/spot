@@ -3,7 +3,15 @@
 # Meaning signing the transaction need to happen in your cold/offline environement.
 # We're ok here as we're only playing with TESTNET.
 
-source $HOME/stake-pool-tools/node-scripts/utils.sh
+# global variables
+now=`date +"%Y%m%d_%H%M%S"`
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=~/pool_topology
+
+# importing utility functions
+source $NS_PATH/utils.sh
 
 if [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
 elif [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; STAKE_CERT_FILE=$6; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
@@ -29,10 +37,6 @@ if ! promptyn "Please confirm you want to proceed? (y/n)"; then
     echo "Ok bye!"
     exit 1
 fi
-
-# global variables
-now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
 
 # create working directory for the transaction
 mkdir -p ~/transactions
