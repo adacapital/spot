@@ -46,7 +46,7 @@ else
 fi
 
 # optional override for single server setup
-NODE_TYPE="relay"
+# NODE_TYPE="relay"
 
 echo
 echo '---------------- Preparing devops files ----------------'
@@ -54,6 +54,8 @@ echo '---------------- Preparing devops files ----------------'
 # installing gLiveView tool for relay node
 if [[ $NODE_TYPE == "relay" ]]; then
     cd $HOME/node.relay
+    cp gLiveView.sh gLiveView.sh.$NOW
+    cp env env.$NOW
     curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
     curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
     chmod 755 gLiveView.sh
@@ -72,6 +74,8 @@ fi
 # installing gLiveView tool for bp node
 if [[ $NODE_TYPE == "bp" ]]; then
     cd $HOME/node.bp
+    cp gLiveView.sh gLiveView.sh.$NOW
+    cp env env.$NOW
     curl -s -o gLiveView.sh https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
     curl -s -o env https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
     chmod 755 gLiveView.sh
