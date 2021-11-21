@@ -25,8 +25,8 @@ echo '---------------- Create a JSON file with you testnet pool metadata -------
 # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
 # example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
 GIST_FILE_NAME="adact_testnet.json"
-URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/84f98fce3e58096cf3feceaf202cba17/raw/11001ab2aed856d801afba0382903c4ff31bc79f/$GIST_FILE_NAME"
-META_URL="https://git.io/J1a4f"
+URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/84f98fce3e58096cf3feceaf202cba17/raw/e8dfd21b9be1be9c3e63b22b683cb41900974ecc/$GIST_FILE_NAME"
+META_URL="https://git.io/J16cF"
 
 echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
 
