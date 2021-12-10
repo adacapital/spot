@@ -49,7 +49,7 @@ else
 fi
 
 
-# starting binaries update script if we are one the bp node
+# starting binaries update script if we are on the bp node
 if [[ $NODE_TYPE == "bp" ]]; then
     sudo unattended-upgrade -d
     sudo apt-get update -y
