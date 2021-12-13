@@ -192,7 +192,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
 
     cardano-cli stake-address delegation-certificate \
     --stake-verification-key-file $HOME/keys/stake.vkey \
-    --cold-verification-key-file cold.vkey \
+    --cold-verification-key-file $HOME/cold_keys/cold.vkey \
     --out-file delegation.cert
 
     STATE_SUB_STEP_ID="build.trans"
@@ -217,10 +217,10 @@ fi" >> ~/.bashrc
     cp $HOME/pool_keys/delegation.cert $SPOT_USB_KEY
     STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
     echo "#!/bin/bash
-mv pool-registration.cert $HOME/pool_keys
-mv delegation.cert $HOME/pool_keys
-chmod 400 $HOME/pool_keys/pool-registration.cert
-chmod 400 $HOME/pool_keys/delegation.cert
+mv pool-registration.cert \$HOME/pool_keys
+mv delegation.cert \$HOME/pool_keys
+chmod 400 \$HOME/pool_keys/pool-registration.cert
+chmod 400 \$HOME/pool_keys/delegation.cert
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
     echo
@@ -252,23 +252,12 @@ echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
-    # retrieve the stake pool registration deposit parameter
-    STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
-    echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
-
     # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-    # $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
-    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) 0 NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
 elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey NONE NONE
 elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
     # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
-
-    if [[ ! -s $STATE_TRANS_WORK_DIR/cli.err ]]; then
-        echo "toto here $STATE_TRANS_WORK_DIR"
-        # checking that our pool registration was successful
-        $NS_PATH/pool_info.sh
-    fi
 fi
