@@ -44,7 +44,7 @@ fi
 
 echo
 echo '---------------- Stopping node services ---------------- '
-sudo systemctl stop cncli-sync
+sudo systemctl stop cncli_sync
 sudo systemctl stop run.relay
 sudo systemctl stop run.bp
 
@@ -56,6 +56,6 @@ echo
 echo '---------------- Starting node services ---------------- '
 sudo systemctl start run.relay
 sudo systemctl start run.bp
-sudo systemctl start cncli-sync
+sudo systemctl start cncli_sync
 
 echo 'Node binaries update completed!'
