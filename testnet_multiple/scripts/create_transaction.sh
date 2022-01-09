@@ -270,20 +270,20 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR=$CUR_DIR
+        STATE_TRANS_WORK_DIR="transactions/$now"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
         STATE_APPLY_SCRIPT=$HOME/apply_state.sh
         echo
-        echo "Please copy the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+        echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
         echo $STATE_FILE
         echo $CUR_DIR/tx.raw
         echo $STATE_APPLY_SCRIPT
 
         echo "#!/bin/bash
-mkdir -p $CUR_DIR
-mv tx.raw $CUR_DIR
+mkdir -p \$HOME/transactions/$now
+mv tx.raw \$HOME/transactions/$now
 echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
     elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]; then
@@ -300,20 +300,20 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR=$CUR_DIR
+        STATE_TRANS_WORK_DIR="transactions/$now"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
         STATE_APPLY_SCRIPT=$HOME/apply_state.sh
         echo
-        echo "Please copy the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+        echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
         echo $STATE_FILE
         echo $CUR_DIR/tx.raw
         echo $STATE_APPLY_SCRIPT
 
         echo "#!/bin/bash
-mkdir -p $CUR_DIR
-mv tx.raw $CUR_DIR
+mkdir -p \$HOME/transactions/$now
+mv tx.raw \$HOME/transactions/$now
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
     fi
 fi
@@ -326,8 +326,8 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
     if [[ $STAKE_CERT_FILE != "" ]]; then WITCNT=2; fi
     if [[ $DELEGATION_CERT_FILE != "" ]]; then WITCNT=3; fi
 
-    CUR_DIR=$STATE_TRANS_WORK_DIR
-    cd $STATE_TRANS_WORK_DIR
+    CUR_DIR=$HOME/$STATE_TRANS_WORK_DIR
+    cd $CUR_DIR
 
     # sign the transaction
     if [[ $WITCNT -eq 1 ]]; then
@@ -369,8 +369,8 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
         STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
         echo "#!/bin/bash
-mkdir -p $CUR_DIR
-mv tx.signed $CUR_DIR
+mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
+mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
 echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
         echo
@@ -408,8 +408,8 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
         STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
         echo "#!/bin/bash
-mkdir -p $CUR_DIR
-mv tx.signed $CUR_DIR
+mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
+mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
         echo
@@ -421,10 +421,10 @@ if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
     echo
     echo '----------------Submitting the transaction... ----------------'
     
-    CUR_DIR=$STATE_TRANS_WORK_DIR
-    cd $STATE_TRANS_WORK_DIR
+    CUR_DIR=$HOME/$STATE_TRANS_WORK_DIR
+    cd $CUR_DIR
 
-    if ! promptyn "Please confirm you want to proceed with sending transaction $STATE_TRANS_WORK_DIR? (y/n)"; then
+    if ! promptyn "Please confirm you want to proceed with sending transaction $CUR_DIR? (y/n)"; then
         echo "Ok bye!"
         exit 1
     fi

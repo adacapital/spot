@@ -74,6 +74,12 @@ if [ -f "$STATE_FILE" ]; then
             echo "Bye for now!"
             exit 1
         fi
+    elif [[ $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_opcert_gen" ]]; then
+        if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
+            echo "Warning, to proceed further your environment must be air-gapped."
+            echo "Bye for now!"
+            exit 1
+        fi
     else
         STATE_STEP_ID=4
         STATE_SUB_STEP_ID="rotate_kes_keys_init"
@@ -136,7 +142,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE
     # copy certain files back to the air-gapped environment to continue operation there
     STATE_APPLY_SCRIPT=$HOME/apply_state.sh
     echo
-    echo "Please move the following files back to your air-gapped environment in $HOME/cardano and run apply_state.sh."
+    echo "Please move the following files back to your air-gapped environment in your home directory and run apply_state.sh."
     echo $STATE_FILE
     echo $HOME/pool_keys/kes.vkey
     echo $STATE_APPLY_SCRIPT
@@ -144,15 +150,15 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE
     echo "#!/bin/bash
 echo
 echo '---------------- Backing up previous KES key pair ----------------'
-chmod 664 $HOME/pool_keys/kes.vkey
-mv $HOME/pool_keys/kes.vkey $HOME/pool_keys/kes.vkey.$NOW
-chmod 400 $HOME/pool_keys/kes.vkey.$NOW
+chmod 664 \$HOME/pool_keys/kes.vkey
+mv \$HOME/pool_keys/kes.vkey \$HOME/pool_keys/kes.vkey.$NOW
+chmod 400 \$HOME/pool_keys/kes.vkey.$NOW
 echo '---------------- Backing up previous operational certificate ----------------'
-chmod 664 $HOME/pool_keys/node.cert
-mv $HOME/pool_keys/node.cert $HOME/pool_keys/node.cert.$NOW
-chmod 400 $HOME/pool_keys/node.cert.$NOW
-mv kes.vkey $HOME/pool_keys
-chmod 400 $HOME/pool_keys/kes.vkey
+chmod 664 \$HOME/pool_keys/node.cert
+mv \$HOME/pool_keys/node.cert \$HOME/pool_keys/node.cert.$NOW
+chmod 400 \$HOME/pool_keys/node.cert.$NOW
+mv kes.vkey \$HOME/pool_keys
+chmod 400 \$HOME/pool_keys/kes.vkey
 echo \"state applied, please now run rotate_kes_keys.sh\"" > $STATE_APPLY_SCRIPT
 fi
 
@@ -192,9 +198,9 @@ fi" >> ~/.bashrc
     cp $HOME/pool_keys/node.cert $SPOT_USB_KEY
     STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
     echo "#!/bin/bash
-mkdir -p $HOME/keys
-mv node.cert $HOME/pool_keys
-chmod 400 $HOME/pool_keys/node.cert
+mkdir -p \$HOME/pool_keys
+mv node.cert \$HOME/pool_keys
+chmod 400 \$HOME/pool_keys/node.cert
 echo
 echo '---------------- Restarting bp node ----------------'
 sudo systemctl restart run.bp
