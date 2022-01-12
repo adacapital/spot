@@ -9,6 +9,11 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 
+echo "UPDATE POOL REGISTRATION STARTING..."
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "NS_PATH: $NS_PATH"
+
 # importing utility functions
 source $NS_PATH/utils.sh
 
@@ -92,7 +97,6 @@ fi
 
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
 
-
 cd $HOME/pool_keys
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "init" ]]; then
@@ -100,8 +104,8 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     echo '---------------- Create a JSON file with you testnet pool metadata ----------------'
     # use a url you control (e.g. through your pool's website)
     # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
-    # example: https://gist.githubusercontent.com/adacapital/ad034a7b4fd5a938b64a144101e0d17a/raw/756134a36ff94e6ae6e372f195b5463661bc463d/adak_testnet_multiple.json becomes https://git.io/JW6sJ
-    GIST_FILE_NAME="adakt_testnet.json.json"
+    # example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
+    GIST_FILE_NAME="adakt_testnet.json"
     URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/cf57f06ba57830df38e140dc5f67f50f/raw/283cca8932b07ae8fb5dee8b956b29a7ed66fcdf/$GIST_FILE_NAME"
     META_URL="https://git.io/JDsXg"
 
@@ -213,10 +217,10 @@ fi" >> ~/.bashrc
     cp $HOME/pool_keys/delegation.cert $SPOT_USB_KEY
     STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
     echo "#!/bin/bash
-mv pool-registration.cert $HOME/pool_keys
-mv delegation.cert $HOME/pool_keys
-chmod 400 $HOME/pool_keys/pool-registration.cert
-chmod 400 $HOME/pool_keys/delegation.cert
+mv pool-registration.cert \$HOME/pool_keys
+mv delegation.cert \$HOME/pool_keys
+chmod 400 \$HOME/pool_keys/pool-registration.cert
+chmod 400 \$HOME/pool_keys/delegation.cert
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
     echo
@@ -248,23 +252,12 @@ echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
-    # retrieve the stake pool registration deposit parameter
-    STAKE_POOL_DEPOSIT=$( cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams.poolDeposit')
-    echo "STAKE_POOL_DEPOSIT: $STAKE_POOL_DEPOSIT"
-
     # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-    # $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
-    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) $STAKE_POOL_DEPOSIT NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) 0 NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
 elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey NONE NONE
 elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
     # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE
-
-    if [[ ! -s $STATE_TRANS_WORK_DIR/cli.err ]]; then
-        echo "toto here $STATE_TRANS_WORK_DIR"
-        # checking that our pool registration was successful
-        $NS_PATH/pool_info.sh
-    fi
 fi
