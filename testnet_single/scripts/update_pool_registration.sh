@@ -30,6 +30,12 @@ META_URL="https://git.io/J16cF"
 
 echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
 
+# if metadata json file exists archive it
+if [ -f "$GIST_FILE_NAME" ]; then
+    echo "Found old $GIST_FILE_NAME, moved it to $GIST_FILE_NAME.$NOW"
+    mv $GIST_FILE_NAME $GIST_FILE_NAME.$NOW
+fi
+
 # download the file from gist
 wget $URL_TO_RAW_GIST_FILE
 # create a hash of your metadata file
