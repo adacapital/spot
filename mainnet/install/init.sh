@@ -152,6 +152,18 @@ git checkout 66f017f1
 make
 sudo make install
 
+echo
+echo '---------------- secp256k1 dependency ----------------'
+cd ~/download
+git clone https://github.com/bitcoin-core/secp256k1.git
+cd secp256k1
+git reset --hard ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+./autogen.sh
+./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
+make
+make check
+sudo make install
+
 # Add /usr/local/lib to $LD_LIBRARY_PATH and ~/.bashrc if required
 echo "\$LD_LIBRARY_PATH Before: $LD_LIBRARY_PATH"
 if [[ ! ":$LD_LIBRARY_PATH:" == *":/usr/local/lib:"* ]]; then
