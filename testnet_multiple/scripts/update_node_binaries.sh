@@ -48,7 +48,6 @@ else
     exit 1
 fi
 
-
 # starting binaries update script if we are on the bp node
 if [[ $NODE_TYPE == "bp" ]]; then
     sudo unattended-upgrade -d
@@ -59,10 +58,19 @@ if [[ $NODE_TYPE == "bp" ]]; then
 
     echo
     echo '---------------- Updating the node from source ---------------- '
+    cd ~/download
+    git clone https://github.com/input-output-hk/cardano-node.git
+
     cd ~/download/cardano-node
-    git fetch --all --tags
+    git fetch --all --recurse-submodules --tags
+    # git fetch --all --tags
     # git checkout "tags/$1"
-    git checkout p2p-master-1.31.0
+    # git checkout p2p-master-1.31.0
+    # git checkout karknu/blockfetch_order
+    git checkout "$1"
+
+    cabal configure --with-compiler=ghc-8.10.4
+    echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
 
     echo
     git describe --tags

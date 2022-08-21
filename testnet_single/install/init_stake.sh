@@ -4,7 +4,15 @@
 
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+echo $NS_PATH
+
+# importing utility functions
+source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Generating payment and stake keys / addresses ----------------'
@@ -33,7 +41,7 @@ chmod 400 stake.vkey stake.skey
 cardano-cli stake-address build \
 --stake-verification-key-file stake.vkey \
 --out-file stake.addr \
---testnet-magic 1097911063
+--testnet-magic $MAGIC
 
 chmod 400 stake.addr
 
@@ -42,7 +50,7 @@ cardano-cli address build \
 --payment-verification-key-file payment.vkey \
 --stake-verification-key-file stake.vkey \
 --out-file paymentwithstake.addr \
---testnet-magic 1097911063
+--testnet-magic $MAGIC
 
 chmod 400 paymentwithstake.addr
 
@@ -55,11 +63,16 @@ cardano-cli stake-address registration-certificate \
 
 chmod 400 stake.cert
 
+if ! promptyn "Please confirm paymentwithstake.addr is funded? (y/n)"; then
+    echo "Please fund paymentwithstake.addr and run init_stake again."
+    exit 1
+fi
+
 echo
 echo '---------------- Registering staking adddress ----------------'
 
 # retrieve the stake address deposit parameter
-STAKE_ADDRESS_DEPOSIT=$(cardano-cli query protocol-parameters --testnet-magic 1097911063 | jq -r '.stakeAddressDeposit')
+STAKE_ADDRESS_DEPOSIT=$(cardano-cli query protocol-parameters --testnet-magic $MAGIC | jq -r '.stakeAddressDeposit')
 echo "STAKE_ADDRESS_DEPOSIT: $STAKE_ADDRESS_DEPOSIT"
 
 # create a transaction to register our staking address onto the blockchain

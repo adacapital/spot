@@ -2,12 +2,17 @@
 # In a real life scenario (MAINNET), you need to have your keys under cold storage.
 # We're ok here as we're only playing with TESTNET.
 
-source $HOME/stake-pool-tools/node-scripts/utils.sh
-
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
-NS_PATH="$HOME/stake-pool-tools/node-scripts"
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+echo $NS_PATH
 
+# importing utility functions
+source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 cd $HOME/pool_keys
 
@@ -16,9 +21,9 @@ echo '---------------- Create a JSON file with you testnet pool metadata -------
 # use a url you control (e.g. through your pool's website)
 # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
 # example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
-GIST_FILE_NAME="adact_testnet.json"
-URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/84f98fce3e58096cf3feceaf202cba17/raw/6578b562ae0bffa2eef5e1da8057880b44a21653/$GIST_FILE_NAME"
-META_URL="https://git.io/Juean"
+GIST_FILE_NAME="adact_preprod.json"
+URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/7dbcb0c602a0e902c8eea7afd55c5ec8/raw/5ef94986f4581b4941ca41c55595fd033eedf36c/$GIST_FILE_NAME"
+META_URL="https://bit.ly/3T5uNen"
 
 echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
 
@@ -56,8 +61,10 @@ cardano-cli stake-pool registration-certificate \
 --pool-margin $POOL_MARGIN \
 --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
 --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
---testnet-magic 1097911063 \
---pool-relay-ipv4 51.104.251.142 \
+--testnet-magic $MAGIC \
+--pool-relay-ipv4 20.90.201.81 \
+--pool-relay-port 3001 \
+--pool-relay-ipv4 20.98.184.3 \
 --pool-relay-port 3001 \
 --metadata-url $META_URL \
 --metadata-hash $META_DATA_HASH \
@@ -68,7 +75,7 @@ echo '---------------- Create a delegation certificate ----------------'
 
 cardano-cli stake-address delegation-certificate \
 --stake-verification-key-file $HOME/keys/stake.vkey \
---cold-verification-key-file $HOME/cold_keys/cold.vkey \
+--cold-verification-key-file $HOME/pool_keys/cold.vkey \
 --out-file delegation.cert
 
 echo

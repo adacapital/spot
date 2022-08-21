@@ -12,9 +12,11 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 if [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
-elif [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; STAKE_CERT_FILE=$6; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
+elif [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; STAKE_CERT_FILE=$6; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
 elif [[ $# -eq 8 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" && ! $7 == "" && ! $8 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; COLD_KEY_FILE=$6; POOL_CERT_FILE=$7; DELEGATION_CERT_FILE=$8; STAKE_CERT_FILE="";
 else 
     echo -e "This script requires input parameters:\n\tUsages:"
@@ -46,11 +48,11 @@ cd $now
 CUR_DIR=`pwd`
 
 # get protocol parameters
-cardano-cli query protocol-parameters --testnet-magic 1097911063 --out-file protocol.json
+cardano-cli query protocol-parameters --testnet-magic $MAGIC --out-file protocol.json
 
 # determine the TTL (Time To Live) for the transaction
 # CTIP : the current tip of the blockchain
-CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+CTIP=$(cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
 TTL=$(expr $CTIP + 1200)
 
 echo "CTIP: $CTIP"
@@ -150,7 +152,7 @@ FEE=$(cardano-cli transaction calculate-min-fee \
    --tx-out-count ${TXOCNT} \
    --witness-count ${WITCNT} \
    --byron-witness-count 0 \
-   --testnet-magic 1097911063 \
+   --testnet-magic $MAGIC \
    --protocol-params-file protocol.json | awk '{print $1}')
 
 UTXO_LOVELACE_BALANCE_FINAL=$(expr $TOTAL_BALANCE - $LOVELACE_AMOUNT - $FEE)
@@ -223,7 +225,7 @@ if [[ $WITCNT -eq 1 ]]; then
     cardano-cli transaction sign \
     --tx-body-file tx.raw \
     --signing-key-file $SKEY_FILE \
-    --testnet-magic 1097911063 \
+    --testnet-magic $MAGIC \
     --out-file tx.signed
 elif [[ $WITCNT -eq 2 ]]; then
     echo "Signing the transaction with two witnesses"
@@ -232,7 +234,7 @@ elif [[ $WITCNT -eq 2 ]]; then
     --tx-body-file tx.raw \
     --signing-key-file $SKEY_FILE \
     --signing-key-file $SKEY_FILE_STAKE \
-    --testnet-magic 1097911063 \
+    --testnet-magic $MAGIC \
     --out-file tx.signed
 elif [[ $WITCNT -eq 3 ]]; then
     echo "Signing the transaction with three witnesses"
@@ -242,13 +244,13 @@ elif [[ $WITCNT -eq 3 ]]; then
     --signing-key-file $SKEY_FILE \
     --signing-key-file $SKEY_FILE_STAKE \
     --signing-key-file $COLD_KEY_FILE \
-    --testnet-magic 1097911063 \
+    --testnet-magic $MAGIC \
     --out-file tx.signed
 fi
 
 # submit the transaction
 cardano-cli transaction submit \
 --tx-file tx.signed \
---testnet-magic 1097911063
+--testnet-magic $MAGIC
 
 echo "transaction working dir: $CUR_DIR"

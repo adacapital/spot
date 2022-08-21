@@ -97,3 +97,17 @@ get_topo () {
 
     echo "$ERROR $NODE_TYPE $BP_IP ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
 }
+
+# spot topology utils
+get_network_magic () {
+    CONF=~/node.bp/config/bgenesis.json
+    if [ ! -f "$CONF" ]; then
+        CONF=~/node.relay/config/bgenesis.json
+        if [ ! -f "$CONF" ]; then
+            echo "get_network_magic(): byron genesis file not found, bye for now!"
+            exit
+        fi
+    fi
+    MAGIC=`cat $CONF | jq -r .protocolConsts.protocolMagic`
+    echo "$MAGIC"
+}

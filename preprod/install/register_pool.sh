@@ -11,6 +11,8 @@ NS_PATH="$SPOT_DIR/scripts"
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'

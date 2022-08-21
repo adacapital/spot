@@ -69,9 +69,6 @@ if [[ $NODE_TYPE == "bp" ]]; then
     # git checkout karknu/blockfetch_order
     git checkout "$1"
 
-    cabal configure --with-compiler=ghc-8.10.4
-    echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" > cabal.project.local
-
     echo
     git describe --tags
 

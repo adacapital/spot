@@ -82,7 +82,7 @@ echo '---------------- Create a delegation certificate ----------------'
 
 cardano-cli stake-address delegation-certificate \
 --stake-verification-key-file $HOME/keys/stake.vkey \
---cold-verification-key-file $HOME/cold_keys/cold.vkey \
+--cold-verification-key-file $HOME/pool_keys/cold.vkey \
 --out-file delegation.cert
 
 echo
