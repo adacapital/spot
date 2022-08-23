@@ -7,7 +7,6 @@ now=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
-echo $NS_PATH
 
 # importing utility functions
 source $NS_PATH/utils.sh

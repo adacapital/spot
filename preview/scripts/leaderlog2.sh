@@ -7,7 +7,7 @@ if [[ $1 == "--help" || $1 == "--h" ]]; then
 fi
 
 # global variables
-NOW=`date +"%Y%m%d_%H%M%S"`
+now=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
@@ -15,6 +15,8 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -66,7 +68,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     if [[ $CNCLI_STATUS == "ok" ]]; then
         echo "CNCLI database is synced."
 
-        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic 1097911063)
+        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC)
 
         if [[ $EPOCH == "next" ]]; then
             POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeMark": )\d+(?=,?)')
