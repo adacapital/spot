@@ -15,6 +15,8 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -66,7 +68,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     if [[ $CNCLI_STATUS == "ok" ]]; then
         echo "CNCLI database is synced."
 
-        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic 1097911063)
+        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC)
 
         if [[ $EPOCH == "next" ]]; then
             POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeMark": )\d+(?=,?)')
@@ -83,7 +85,9 @@ if [[ $NODE_TYPE == "bp" ]]; then
         echo "POOL_STAKE: $(echo $POOL_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
         echo "ACTIVE_STAKE: $(echo $ACTIVE_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
 
-        mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
+        if [ -f $HOME/node.bp/cncli/leaderlog.json ]; then
+            mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
+        fi
         getLeader "$POOL_STAKE" "$ACTIVE_STAKE" > $HOME/node.bp/cncli/leaderlog.json
 
         LOG=$HOME/node.bp/cncli/leaderlog.json

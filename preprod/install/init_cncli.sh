@@ -10,6 +10,11 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
+
+# calculating the shelley hash
+SHELLEY_GENESIS_HASH=$(cardano-cli genesis hash --genesis ~/node.bp/config/sgenesis.json)
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -39,11 +44,11 @@ if [[ $NODE_TYPE == "bp" ]]; then
     echo
     echo '---------------- Installing CNCLI binary ----------------'
 
-    RELEASETAG=$(curl -s https://api.github.com/repos/AndrewWestberg/cncli/releases/latest | jq -r .tag_name)
+    RELEASETAG=$(curl -s https://api.github.com/repos/cardano-community/cncli/releases/latest | jq -r .tag_name)
     VERSION=$(echo ${RELEASETAG} | cut -c 2-)
     echo "Installing CNCLI binary release ${RELEASETAG}"
     mkdir -p $HOME/download/cncli
-    curl -sLJ https://github.com/AndrewWestberg/cncli/releases/download/${RELEASETAG}/cncli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz -o $HOME/download/cncli/cncli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz
+    curl -sLJ https://github.com/cardano-community/cncli/releases/download/${RELEASETAG}/cncli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz -o $HOME/download/cncli/cncli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz
 
     sudo tar xzvf $HOME/download/cncli/cncli-${VERSION}-x86_64-unknown-linux-gnu.tar.gz -C /usr/local/bin/
 
@@ -67,7 +72,7 @@ Type=simple
 Restart=always
 RestartSec=5
 LimitNOFILE=131072
-ExecStart=/usr/local/bin/cncli sync --network-magic 1097911063 --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $HOME/node.bp/cncli/cncli.db
+ExecStart=/usr/local/bin/cncli sync --network-magic 1097911063 --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $HOME/node.bp/cncli/cncli.db --shelley-genesis-hash $SHELLEY_GENESIS_HASH
 KillSignal=SIGINT
 SuccessExitStatus=143
 StandardOutput=syslog
