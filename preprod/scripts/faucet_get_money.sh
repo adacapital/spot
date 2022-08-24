@@ -44,7 +44,7 @@ ERROR=$(echo $OUTPUT | jq -r ".error.tag")
 if [ $ERROR == "FaucetWebErrorRateLimitExeeeded" ];then
     WAIT_SECONDS=$(echo $OUTPUT | jq -r ".error.contents" | jq '.[0]')
     SLEEP_SECONDS=$(echo $WAIT_SECONDS + 1 | bc)
-
+    
     echo "Asked to wait for $WAIT_SECONDS seconds, sleeping for $SLEEP_SECONDS seconds" >> $OUTFILE
 
     sleep $SLEEP_SECONDS
