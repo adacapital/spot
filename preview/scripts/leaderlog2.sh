@@ -54,6 +54,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     function getLeader() {
         # echo "getLeader, pool-stake $1, active-stake $2"
         /usr/local/bin/cncli leaderlog \
+            --consensus tpraos \
             --db $HOME/node.bp/cncli/cncli.db \
             --pool-id  $POOL_ID \
             --pool-vrf-skey $HOME/pool_keys/vrf.skey \
@@ -85,7 +86,9 @@ if [[ $NODE_TYPE == "bp" ]]; then
         echo "POOL_STAKE: $(echo $POOL_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
         echo "ACTIVE_STAKE: $(echo $ACTIVE_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
 
-        mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
+        if [ -f $HOME/node.bp/cncli/leaderlog.json ]; then
+            mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
+        fi
         getLeader "$POOL_STAKE" "$ACTIVE_STAKE" > $HOME/node.bp/cncli/leaderlog.json
 
         LOG=$HOME/node.bp/cncli/leaderlog.json
