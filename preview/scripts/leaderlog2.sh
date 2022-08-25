@@ -7,7 +7,7 @@ if [[ $1 == "--help" || $1 == "--h" ]]; then
 fi
 
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
@@ -54,7 +54,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     function getLeader() {
         # echo "getLeader, pool-stake $1, active-stake $2"
         /usr/local/bin/cncli leaderlog \
-            --consensus tpraos \
+            --consensus praos \
             --db $HOME/node.bp/cncli/cncli.db \
             --pool-id  $POOL_ID \
             --pool-vrf-skey $HOME/pool_keys/vrf.skey \
