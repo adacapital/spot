@@ -16,6 +16,8 @@ echo "NS_PATH: $NS_PATH"
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 cd $HOME/pool_keys
 
@@ -24,11 +26,14 @@ echo '---------------- Create a JSON file with you testnet pool metadata -------
 # use a url you control (e.g. through your pool's website)
 # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
 # example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
-GIST_FILE_NAME="adact_testnet.json"
-URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/84f98fce3e58096cf3feceaf202cba17/raw/e8dfd21b9be1be9c3e63b22b683cb41900974ecc/$GIST_FILE_NAME"
-META_URL="https://git.io/J16cF"
+# GIST_FILE_NAME="adact_preview.json"
+# URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/b93aafb9c1a06c978cfadb8ca18db41a/raw/64b51332b5e5dfdb095e425d70c0c953c2758ef6/$GIST_FILE_NAME"
+# META_URL="https://bit.ly/3R6eD2V"
 
-echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
+GIST_FILE_NAME="adact_preview.json"
+META_URL="https://adacapital.io/$GIST_FILE_NAME"
+
+echo "META_URL: $META_URL"
 
 # if metadata json file exists archive it
 if [ -f "$GIST_FILE_NAME" ]; then
@@ -37,7 +42,7 @@ if [ -f "$GIST_FILE_NAME" ]; then
 fi
 
 # download the file from gist
-wget $URL_TO_RAW_GIST_FILE
+wget $META_URL
 # create a hash of your metadata file
 META_DATA_HASH="$(cardano-cli stake-pool metadata-hash --pool-metadata-file $GIST_FILE_NAME)"
 echo "META_DATA_HASH: $META_DATA_HASH"
@@ -70,7 +75,7 @@ cardano-cli stake-pool registration-certificate \
 --pool-margin $POOL_MARGIN \
 --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
 --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
---testnet-magic 1097911063 \
+--testnet-magic $MAGIC \
 --pool-relay-ipv4 51.104.251.142 \
 --pool-relay-port 3001 \
 --metadata-url $META_URL \
