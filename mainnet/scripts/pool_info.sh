@@ -74,8 +74,8 @@ fi
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $POOL_ID_BECH32 $POOL_ID_HEX
 
 if [[ -s $HOME/node.bp/pool_info.json ]]; then
-    POOL_ID_BECH32=$(cat node.bp/pool_info.json | jq .pool_id_bech32)
-    POOL_ID_HEX=$(cat node.bp/pool_info.json | jq .pool_id_hex)
+    POOL_ID_BECH32=$(cat node.bp/pool_info.json | jq .pool_id_bech32 | tr -d '"')
+    POOL_ID_HEX=$(cat node.bp/pool_info.json | jq .pool_id_hex | tr -d '"')
 
     STATE_SUB_STEP_ID="get_info"
 else

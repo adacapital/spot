@@ -11,6 +11,8 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -74,8 +76,8 @@ fi
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $POOL_ID_BECH32 $POOL_ID_HEX
 
 if [[ -s $HOME/node.bp/pool_info.json ]]; then
-    POOL_ID_BECH32=$(cat node.bp/pool_info.json | jq .pool_id_bech32)
-    POOL_ID_HEX=$(cat node.bp/pool_info.json | jq .pool_id_hex)
+    POOL_ID_BECH32=$(cat node.bp/pool_info.json | jq .pool_id_bech32 | tr -d '"')
+    POOL_ID_HEX=$(cat node.bp/pool_info.json | jq .pool_id_hex | tr -d '"')
 
     STATE_SUB_STEP_ID="get_info"
 else
@@ -118,10 +120,10 @@ fi
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "get_info" ]]; then
     # retrieve the pool delegation state
-    REG_JSON=$(cardano-cli query ledger-state --testnet-magic 1097911063 | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
+    REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
 
     # retrieve the pool's stake distribution and rank
-    STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic 1097911063 | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
+    STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic $MAGIC | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
     STAKE_DIST_RANK=$(echo $STAKE_DIST | awk '{print $1}')
     STAKE_DIST_FRACTION_DEC=$(echo $STAKE_DIST | awk '{print $3}' | awk -F"E" 'BEGIN{OFMT="%10.10f"} {print $1 * (10 ^ $2)}')
     STAKE_DIST_FRACTION_PCT=$(echo $STAKE_DIST_FRACTION_DEC*100 | bc )
@@ -138,11 +140,11 @@ $(cat <<-END > $HOME/node.bp/pool_info.tmp.json
 END
 )
 
-# format json file
-cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
-rm -f $HOME/node.bp/pool_info.tmp.json
+# # format json file
+# cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
+# rm -f $HOME/node.bp/pool_info.tmp.json
 
-# display pool info json file
-echo "$HOME/node.bp/pool_info.json"
-cat $HOME/node.bp/pool_info.json
+# # display pool info json file
+# echo "$HOME/node.bp/pool_info.json"
+# cat $HOME/node.bp/pool_info.json
 fi

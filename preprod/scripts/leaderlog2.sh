@@ -54,6 +54,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     function getLeader() {
         # echo "getLeader, pool-stake $1, active-stake $2"
         /usr/local/bin/cncli leaderlog \
+            --consensus tpraos \
             --db $HOME/node.bp/cncli/cncli.db \
             --pool-id  $POOL_ID \
             --pool-vrf-skey $HOME/pool_keys/vrf.skey \

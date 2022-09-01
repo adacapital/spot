@@ -105,18 +105,19 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     # use a url you control (e.g. through your pool's website)
     # here we will be using a gist in github (make sure the url is less than 65 character long, shorten it with git.io)
     # example: https://gist.githubusercontent.com/adacapital/54d432465f85417e3793b89fd16539f3/raw/68eca2ca75dcafe48976d1dfa5bf7f06eda08c1f/adak_testnet.json becomes https://git.io/J3SYo
-    GIST_FILE_NAME="adakt_testnet.json"
-    URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/cf57f06ba57830df38e140dc5f67f50f/raw/283cca8932b07ae8fb5dee8b956b29a7ed66fcdf/$GIST_FILE_NAME"
-    META_URL="https://git.io/JDsXg"
+    # GIST_FILE_NAME="adakt_testnet.json"
+    # URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/cf57f06ba57830df38e140dc5f67f50f/raw/283cca8932b07ae8fb5dee8b956b29a7ed66fcdf/$GIST_FILE_NAME"
+    # META_URL="https://git.io/JDsXg"
+
+    GIST_FILE_NAME="adact_preprod.json"
+    META_URL="https://adacapital.io/$GIST_FILE_NAME"
 
     GIST_FILE_NAME=$(prompt_input_default GIST_FILE_NAME $GIST_FILE_NAME)
-    URL_TO_RAW_GIST_FILE=$(prompt_input_default URL_TO_RAW_GIST_FILE $URL_TO_RAW_GIST_FILE)
     META_URL=$(prompt_input_default META_URL $META_URL)
 
     echo
     echo "Details of your gist file containing the metadata to be used for your pool registration certificate:"
     echo "GIST_FILE_NAME: $GIST_FILE_NAME"
-    echo "URL_TO_RAW_GIST_FILE: $URL_TO_RAW_GIST_FILE"
     echo "META_URL: $META_URL"
     if ! promptyn "Please confirm you want to proceed? (y/n)"; then
         echo "Ok bye!"
@@ -130,7 +131,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     fi
 
     # download the file from gist
-    wget $URL_TO_RAW_GIST_FILE
+    wget $META_URL
     # create a hash of your metadata file
     META_DATA_HASH="$(cardano-cli stake-pool metadata-hash --pool-metadata-file $GIST_FILE_NAME)"
     echo "META_DATA_HASH: $META_DATA_HASH"
