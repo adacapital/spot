@@ -59,9 +59,20 @@ if [[ $NODE_TYPE == "bp" ]]; then
 
     echo
     echo '---------------- Updating the node from source ---------------- '
-    cd ~/download/cardano-node
-    git fetch --all --tags
-    git checkout "tags/$1"
+
+    CARDANO_NODE_CLONE_DIR=~/download/cardano-node
+    if [ ! -d "$CARDANO_NODE_CLONE_DIR" ]; then
+        echo "Cloning cardano-node source."
+        cd ~/download
+        git clone https://github.com/input-output-hk/cardano-node.git
+        cd ~/download/cardano-node
+    else
+        echo "Updating cardano-node source."
+        cd ~/download/cardano-node
+        git fetch --all --recurse-submodules --tags
+    fi
+
+    git checkout "$1"
 
     echo
     git describe --tags
