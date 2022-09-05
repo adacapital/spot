@@ -11,6 +11,8 @@ TOPO_FILE=~/pool_topology
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -130,7 +132,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE
     echo '---------------- Gathering some information to generate the operational certificate ----------------'
 
     SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-    CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+    CTIP=$(cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
     KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
     STATE_SUB_STEP_ID="rotate_kes_keys_opcert_gen"
     save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE SLOTSPERKESPERIOD CTIP KES_PERIOD
