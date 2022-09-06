@@ -120,7 +120,8 @@ fi
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "get_info" ]]; then
     # retrieve the pool delegation state
-    REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
+    NEW_REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."fPParams pState".'\"$POOL_ID_HEX\"'')
+    CUR_REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
 
     # retrieve the pool's stake distribution and rank
     STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic $MAGIC | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
@@ -133,7 +134,8 @@ $(cat <<-END > $HOME/node.bp/pool_info.tmp.json
 {
     "pool_id_bech32": "${POOL_ID_BECH32}", 
     "pool_id_hex": "${POOL_ID_HEX}", 
-    "delegation_state": ${REG_JSON},
+    "new_delegation_state": ${NEW_REG_JSON},
+    "current_delegation_state": ${CUR_REG_JSON},
     "stake_distribution_rank": ${STAKE_DIST_RANK},
     "stake_distribution_fraction_pct": ${STAKE_DIST_FRACTION_PCT}
 }
@@ -141,10 +143,10 @@ END
 )
 
 # # format json file
-# cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
-# rm -f $HOME/node.bp/pool_info.tmp.json
+cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
+rm -f $HOME/node.bp/pool_info.tmp.json
 
 # # display pool info json file
-# echo "$HOME/node.bp/pool_info.json"
-# cat $HOME/node.bp/pool_info.json
+echo "$HOME/node.bp/pool_info.json"
+cat $HOME/node.bp/pool_info.json
 fi

@@ -16,6 +16,8 @@ echo "NS_PATH: $NS_PATH"
 
 # importing utility functions
 source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -188,7 +190,7 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     --pool-margin $POOL_MARGIN \
     --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
     --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
-    --testnet-magic 1097911063 \
+    --testnet-magic $MAGIC \
     $RELAY_PARAMS \
     --metadata-url $META_URL \
     --metadata-hash $META_DATA_HASH \
