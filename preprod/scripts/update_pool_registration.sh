@@ -147,7 +147,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     # copy certain files back to the air-gapped environment to continue operation there
     STATE_APPLY_SCRIPT=$HOME/apply_state.sh
     echo
-    echo "Please move the following files back to your air-gapped environment in your home directory and run register_pool.sh."
+    echo "Please move the following files back to your air-gapped environment in your home directory and run update_pool_registration.sh."
     echo $STATE_FILE
     echo
 fi
