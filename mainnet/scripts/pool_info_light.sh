@@ -58,9 +58,6 @@ if [[ $NODE_TYPE == "airgap" ]]; then
 fi
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
-    # retrieve the pool delegation state
-    # beware this as of 2021.09.09 requires at least 14gig swap + 8gig ram
-    # todo, replace with cncli stake-snapshot to be less memory intensive
     cardano-cli query pool-params --mainnet --stake-pool-id $POOL_ID_HEX > /tmp/pool-params.json
     POOL_PARAMS=$(cat /tmp/pool-params.json)
 
