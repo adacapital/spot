@@ -26,9 +26,6 @@ else
     cardano-cli query utxo --address $PAYMENT_ADDR --testnet-magic $MAGIC > /tmp/query_payment_addr.out
     cat /tmp/query_payment_addr.out
 
-    # get utx0 details of SOURCE_PAYMENT_ADDR
-    UTXO_RAW=$($NS_PATH/query_payment_addr.sh $SOURCE_PAYMENT_ADDR > query_payment_addr.out) 
-
     tail -n +3 /tmp/query_payment_addr.out | sort -k3 -nr > /tmp/utxos.out
 
     TX_IN=""
