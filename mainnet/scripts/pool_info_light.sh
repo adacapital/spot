@@ -61,11 +61,8 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
     # retrieve the pool delegation state
     # beware this as of 2021.09.09 requires at least 14gig swap + 8gig ram
     # todo, replace with cncli stake-snapshot to be less memory intensive
-    cardano-cli query ledger-state --mainnet > $HOME/ledger-state.json
-
-    # retrieve the pool delegation state
-    NEW_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."fPParams pState".'\"$POOL_ID_HEX\"'')
-    CUR_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
+    cardano-cli query pool-params --mainnet --stake-pool-id $POOL_ID_HEX > /tmp/pool-params.json
+    POOL_PARAMS=$(cat /tmp/pool-params.json)
 
     # retrieve the pool's stake distribution and rank
     STAKE_DIST=$(cardano-cli query stake-distribution --mainnet | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
@@ -78,8 +75,7 @@ $(cat <<-END > $HOME/node.bp/pool_info.tmp.json
 {
     "pool_id_bech32": "${POOL_ID_BECH32}", 
     "pool_id_hex": "${POOL_ID_HEX}", 
-    "new_delegation_state": ${NEW_REG_JSON},
-    "current_delegation_state": ${CUR_REG_JSON},
+    "pool-params": ${POOL_PARAMS},
     "stake_distribution_rank": ${STAKE_DIST_RANK},
     "stake_distribution_fraction_pct": ${STAKE_DIST_FRACTION_PCT}
 }
