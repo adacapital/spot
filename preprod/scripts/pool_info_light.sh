@@ -9,8 +9,8 @@ SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 TOPO_FILE=~/pool_topology
 
-POOL_ID_HEX="22ab39540db22349b1934f5dcb7788440c33709ea9fdac07fb343395"
-POOL_ID_BECH32="pool1y24nj4qdkg35nvvnfawukauggsxrxuy74876cplmxsee29w5axc"
+POOL_ID_HEX="1e151db07fb8b554ad0fa5a358b6bb7d460775ff0dbc9f42304e794b"
+POOL_ID_BECH32="pool1rc23mvrlhz64ftg05k343d4m04rqwa0lpk7f7s3sfeu5k78y90c"
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -63,14 +63,14 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
     # retrieve the pool delegation state
     # beware this as of 2021.09.09 requires at least 14gig swap + 8gig ram
     # todo, replace with cncli stake-snapshot to be less memory intensive
-    cardano-cli query ledger-state --testnet-magic $MAGIC > $HOME/ledger-state.json
+    #cardano-cli query ledger-state --testnet-magic $MAGIC > $HOME/ledger-state.json
 
     # retrieve the pool delegation state
     NEW_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."fPParams pState".'\"$POOL_ID_HEX\"'')
     CUR_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
 
     # retrieve the pool's stake distribution and rank
-    STAKE_DIST=$(cardano-cli query stake-distribution --mainnet | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
+    STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic $MAGIC | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
     STAKE_DIST_RANK=$(echo $STAKE_DIST | awk '{print $1}')
     STAKE_DIST_FRACTION_DEC=$(echo $STAKE_DIST | awk '{print $3}' | awk -F"E" 'BEGIN{OFMT="%10.10f"} {print $1 * (10 ^ $2)}')
     STAKE_DIST_FRACTION_PCT=$(echo $STAKE_DIST_FRACTION_DEC*100 | bc )
