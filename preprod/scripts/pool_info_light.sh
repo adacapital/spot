@@ -63,10 +63,6 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
     cardano-cli query pool-params --testnet-magic $MAGIC --stake-pool-id $POOL_ID_HEX > /tmp/pool-params.json
     POOL_PARAMS=$(cat /tmp/pool-params.json)
 
-    # retrieve the pool delegation state
-    NEW_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."fPParams pState".'\"$POOL_ID_HEX\"'')
-    CUR_REG_JSON=$(cat $HOME/ledger-state.json | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
-
     # retrieve the pool's stake distribution and rank
     STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic $MAGIC | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
     STAKE_DIST_RANK=$(echo $STAKE_DIST | awk '{print $1}')
