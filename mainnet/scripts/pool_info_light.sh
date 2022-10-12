@@ -86,4 +86,7 @@ rm -f $HOME/node.bp/pool_info.tmp.json
 # # display pool info json file
 echo "$HOME/node.bp/pool_info.json"
 cat $HOME/node.bp/pool_info.json
+
+# clean up
+rm -f /tmp/pool-params.json
 fi

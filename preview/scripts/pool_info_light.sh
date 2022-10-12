@@ -1,25 +1,23 @@
 #!/bin/bash
-# To be run on air-gapped offline environment
 
 # global variables
 now=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
-echo $NS_PATH
+TOPO_FILE=~/pool_topology
+
+POOL_ID_HEX="7a1eb60498886f626ce3d5fbb6f3e413750b8a5f687b7231b6fcbfee"
+POOL_ID_BECH32="pool10g0tvpyc3phkym8r6hamdulyzd6shzjldpahyvdkljl7ur2adfe"
 
 # importing utility functions
 source $NS_PATH/utils.sh
 MAGIC=$(get_network_magic)
 echo "NETWORK_MAGIC: $MAGIC"
 
-# retrieve pool identifiers
-POOL_ID_BECH32=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/pool_keys/cold.vkey)
-POOL_ID_HEX=$(cardano-cli stake-pool id --cold-verification-key-file $HOME/pool_keys/cold.vkey --output-format hex)
-
 # retrieve the pool delegation states
-NEW_REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."fPParams pState".'\"$POOL_ID_HEX\"'')
-CUR_REG_JSON=$(cardano-cli query ledger-state --testnet-magic $MAGIC | jq '.stateBefore.esLState.delegationState.pstate."pParams pState".'\"$POOL_ID_HEX\"'')
+cardano-cli query pool-params --testnet-magic $MAGIC --stake-pool-id $POOL_ID_HEX > /tmp/pool-params.json
+POOL_PARAMS=$(cat /tmp/pool-params.json)
 
 # retrieve the pool's stake distribution and rank
 STAKE_DIST=$(cardano-cli query stake-distribution --testnet-magic $MAGIC | sort -rgk2 | head -n -2 | nl | grep $POOL_ID_BECH32)
@@ -32,8 +30,7 @@ $(cat <<-END > $HOME/node.bp/pool_info.tmp.json
 {
     "pool_id_bech32": "${POOL_ID_BECH32}", 
     "pool_id_hex": "${POOL_ID_HEX}", 
-    "new_delegation_state": ${NEW_REG_JSON},
-    "current_delegation_state": ${CUR_REG_JSON},
+    "pool-params": ${POOL_PARAMS},
     "stake_distribution_rank": ${STAKE_DIST_RANK},
     "stake_distribution_fraction_pct": ${STAKE_DIST_FRACTION_PCT}
 }
