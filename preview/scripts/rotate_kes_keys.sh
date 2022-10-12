@@ -8,6 +8,11 @@ SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 
+# importing utility functions
+source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
+
 cd $HOME
 cd pool_keys
 
@@ -45,7 +50,7 @@ echo
 echo '---------------- Generating the operational certificate ----------------'
 
 SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-CTIP=$(cardano-cli query tip --testnet-magic 1097911063 | jq -r .slot)
+CTIP=$(cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
 KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
 echo "SLOTSPERKESPERIOD: $SLOTSPERKESPERIOD"
 echo "CTIP: $CTIP"
