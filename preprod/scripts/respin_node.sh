@@ -56,6 +56,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     # purging the node's db
     rm -rf $HOME/node.bp/db/*
     rm -f $HOME/node.bp/cncli/cncli.db*
+    rm -rf $HOME/node.bp/logs
     echo "DB purge done!"
 
     echo
@@ -100,6 +101,7 @@ elif [[ $NODE_TYPE == "relay" ]]; then
     # purging the node's db
     rm -rf $HOME/node.relay/db/*
     rm -f $HOME/node.relay/cncli/cncli.db*
+    rm -rf $HOME/node.relay/logs
     echo "DB purge done!"
 
     echo
