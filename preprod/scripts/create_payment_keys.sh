@@ -1,23 +1,32 @@
 #!/bin/bash
+# global variables
+now=`date +"%Y%m%d_%H%M%S"`
+SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=~/pool_topology
 
-if [[ $# -ge 1 && ! $1 == "" ]]; then bin_name=$1; else echo -e "This script requires input parameters:\n\tUsage: $0 {key_name} {out_dir:optional}"; exit 2; fi
+# importing utility functions
+source $NS_PATH/utils.sh
+MAGIC=$(get_network_magic)
+echo "NETWORK_MAGIC: $MAGIC"
 
-# if out_dir exists, we cd into it to create keys there, otherwise keys are created in current directory
-if [ ! -z "$2" ]; then
-    cd $2
-fi
+if [[ $# -eq 1 && ! $1 == "" ]]; then key_name=$1; key_dir="$HOME/keys" else echo -e "This script requires input parameters:\n\tUsage: $0 {key_name} {out_dir:optional}"; exit 2; 
+elif [[ $# -eq 2 && ! $1 == "" && ! $2 == "" ]]; then key_name=$1; key_dir=$2; else echo -e "This script requires input parameters:\n\tUsage: $0 {key_name} {out_dir:optional}"; exit 2; fi
+
+cd $key_dir
 
 # generate payment key pair
 cardano-cli address key-gen \
---verification-key-file $1.vkey \
---signing-key-file $1.skey
+--verification-key-file $key_name.vkey \
+--signing-key-file $key_name.skey
 
-chmod 400 $1.vkey $1.skey
+chmod 400 $key_name.vkey $key_name.skey
 
 # generate payment address
 cardano-cli address build \
---payment-verification-key-file $1.vkey \
---out-file $1.addr \
---testnet-magic 1097911063
+--payment-verification-key-file $key_name.vkey \
+--out-file $key_name.addr \
+--testnet-magic $MAGIC
 
-chmod 400 $1.addr
+chmod 400 $key_name.addr
