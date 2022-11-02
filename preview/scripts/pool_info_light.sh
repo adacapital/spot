@@ -7,8 +7,8 @@ SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 TOPO_FILE=~/pool_topology
 
-POOL_ID_HEX="7a1eb60498886f626ce3d5fbb6f3e413750b8a5f687b7231b6fcbfee"
-POOL_ID_BECH32="pool10g0tvpyc3phkym8r6hamdulyzd6shzjldpahyvdkljl7ur2adfe"
+POOL_ID_HEX="3867a09729a1f954762eea035a82e2d9d3a14f1fa791a022ef0da242"
+POOL_ID_BECH32="pool18pn6p9ef58u4ga3wagp44qhzm8f6zncl57g6qgh0pk3yytwz54h"
 
 # importing utility functions
 source $NS_PATH/utils.sh
