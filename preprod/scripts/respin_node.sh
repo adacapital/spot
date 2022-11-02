@@ -151,5 +151,8 @@ if [[ $NODE_TYPE == "bp" ]]; then
     echo
     echo "You can now restart the relays."
     echo "You should start the bp in relay mode only by running $HOME/run.bp.respin.sh"
-
+    echo
+    echo "Once registered request delegation here:"
+    echo "Faucet address: https://faucet.preprod.world.dev.cardano.org/basic-faucet"
+    echo "API Key: ooseiteiquo7Wie9oochooyiequi4ooc"
 fi
