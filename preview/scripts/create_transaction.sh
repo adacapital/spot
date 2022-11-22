@@ -65,22 +65,56 @@ tail -n +3 query_payment_addr.out | sort -k3 -nr > utxos.out
 
 echo "Source payment address UTXOs:"
 cat utxos.out
+rm -f assets.out
 
 TX_IN=""
 TOTAL_BALANCE=0
+TOTAL_ASSETS=""
 while read -r UTXO; do
     UTXO_HASH=$(awk '{ print $1 }' <<< "${UTXO}")
     UTXO_TXIX=$(awk '{ print $2 }' <<< "${UTXO}")
     UTXO_BALANCE=$(awk '{ print $3 }' <<< "${UTXO}")
+    UTXO_ASSETS=$(awk -F'lovelace' '{print $2}' <<< "${UTXO}")
+    if [[ ! $UTXO_ASSETS == " + TxOutDatumNone" ]]; then
+        # UTXO_ASSETS="toto"
+        SPLITTED="$(sed "s/ + /\n/g" <<< "$UTXO_ASSETS")"
+        readarray -t ARRAY <<< "$SPLITTED"
+
+        if [[ ${#ARRAY[@]} -gt 2 ]]; then
+            for a in "${ARRAY[@]}"; do
+                if [[ ! $a == "" && ! $a == "TxOutDatumNone" ]]; then
+                    # echo "> '$a'"
+                    ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$a")
+                    ASSET_POLICY=$(awk '{ print $2 }' <<< "$a")
+                    echo "{\"amount\": $ASSET_AMOUNT, \"policy\": \"$ASSET_POLICY\"}" >> assets.out
+                fi
+            done
+        fi
+    else
+        UTXO_ASSETS=""
+    fi
     TOTAL_BALANCE=$((${TOTAL_BALANCE}+${UTXO_BALANCE}))
     echo "TxIn: ${UTXO_HASH}#${UTXO_TXIX}"
     echo "Lovelace: ${UTXO_BALANCE}"
+    echo "Assets: ${UTXO_ASSETS}"
     TX_IN="${TX_IN} --tx-in ${UTXO_HASH}#${UTXO_TXIX}"
 done < utxos.out
 TXCNT=$(cat utxos.out | wc -l)
 echo "Total lovelace balance: $TOTAL_BALANCE"
 echo "UTXO count: $TXCNT"
 echo "TX_IN: $TX_IN"
+
+cat assets.out | jq -s 'group_by(.policy) | map({policy: .[0].policy, amount: map(.amount) | add})' | jq -r '.[] | "\(.amount)\t\(.policy)"' > assets2.out
+while read -r ASSET; do
+    ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$ASSET")
+    ASSET_POLICY=$(awk '{ print $2 }' <<< "$ASSET")
+    if [[ ! $TOTAL_ASSETS == "" ]]; then
+        TOTAL_ASSETS="${TOTAL_ASSETS} + "
+    fi
+    TOTAL_ASSETS="${TOTAL_ASSETS}${ASSET_AMOUNT} ${ASSET_POLICY}"
+done < assets2.out
+echo "TOTAL_ASSETS: ${TOTAL_ASSETS}"
+
 
 if [[ $TX_IN == "" ]]; then
     echo "ERROR: Cannot create transaction, Empty UTXO in SOURCE_PAYMENT_ADDR: $SOURCE_PAYMENT_ADDR"
@@ -210,7 +244,7 @@ elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]
 
     cardano-cli transaction build-raw \
     $TX_IN \
-    --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+    --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
     --ttl $TTL \
     --fee $FEE \
     --out-file tx.raw \
