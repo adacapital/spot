@@ -2,8 +2,8 @@
 
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
-LOCKFILE="/tmp/faucet_get_money_lock"
-OUTFILE="/tmp/faucet_get_money.out"
+LOCKFILE="/tmp/faucet_preprod_get_money_lock"
+OUTFILE="/tmp/faucet_preprod_get_money.out"
 
 if [ -f $LOCKFILE ]
 then
