@@ -66,6 +66,7 @@ tail -n +3 query_payment_addr.out | sort -k3 -nr > utxos.out
 echo "Source payment address UTXOs:"
 cat utxos.out
 rm -f assets.out
+touch assets.out
 
 TX_IN=""
 TOTAL_BALANCE=0
