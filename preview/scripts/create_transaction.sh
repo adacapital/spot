@@ -243,14 +243,25 @@ elif [[ $TXOCNT -eq 1 && $STAKE_CERT_FILE != "" ]]; then
 elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]; then
     echo "Creating a stake pool registration transaction"
 
-    cardano-cli transaction build-raw \
-    $TX_IN \
-    --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
-    --ttl $TTL \
-    --fee $FEE \
-    --out-file tx.raw \
-    --certificate-file $POOL_CERT_FILE \
-    --certificate-file $DELEGATION_CERT_FILE
+    if [[ $TOTAL_ASSETS == "" ]]; then
+        cardano-cli transaction build-raw \
+        $TX_IN \
+        --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+        --ttl $TTL \
+        --fee $FEE \
+        --out-file tx.raw \
+        --certificate-file $POOL_CERT_FILE \
+        --certificate-file $DELEGATION_CERT_FILE
+    else
+        cardano-cli transaction build-raw \
+        $TX_IN \
+        --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
+        --ttl $TTL \
+        --fee $FEE \
+        --out-file tx.raw \
+        --certificate-file $POOL_CERT_FILE \
+        --certificate-file $DELEGATION_CERT_FILE
+    fi
 fi
 
 # sign the transaction
