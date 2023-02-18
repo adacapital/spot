@@ -54,7 +54,7 @@ echo
 echo '---------------- Installing dependencies ----------------'
 sudo apt-get update -y
 sudo apt-get upgrade -y
-sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf -y
+sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf liblmdb-dev libffi7 libgmp10 libncurses-dev libncurses5 libtinfo5 -y
 sudo apt-get install bc tcptraceroute curl -y
 
 echo
