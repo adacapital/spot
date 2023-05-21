@@ -7,147 +7,102 @@ SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 NS_PATH="$SPOT_DIR/scripts"
 TOPO_FILE=~/pool_topology
 
-# importing utility functions
-source $NS_PATH/utils.sh
-
-if [[ $# -eq 1 && ! $1 == "" ]]; then VOTE_TX_HASH=$1;
+if [[ $# -eq 2 && ! $1 == "" && ! $2 == "" ]]; then VOTE_TX_HASH=$1; COLD_VKEY_HASH=$2;
 else 
     echo -e "This script requires input parameters:\n\tUsages:"
-    echo -e "\t\t$0 {vote_transaction_hash}"
+    echo -e "\t\t$0 {vote_transaction_hash} {pool_cold_vkey_hash}"
     exit 2
 fi
 
-cd ~
+# spot/mainnet/scripts/spo_poll_vote.sh fae7bda85acb99c513aeab5f86986047b6f6cbd33a8e11f11c5005513a054dc8 22ab39540db22349b1934f5dcb7788440c33709ea9fdac07fb343395
 
-URL="https://raw.githubusercontent.com/cardano-foundation/CIP-0094-polls/main/networks/mainnet/${VOTE_TX_HASH}/poll.json"
-echo "URL: $URL"
-exit 1
+# importing utility functions
+source $NS_PATH/utils.sh
 
-wget $URL
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
 
-cardano-cli governance answer-poll --poll-file poll.json > poll-answer.json
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
 
-SPOT_DIR=${HOME}/spot/preview
-# RES=$($SPOT_DIR/scripts/create_transaction.sh)
-$SPOT_DIR/scripts/create_transaction.sh $(cat ~/tmp/paymentwithstake.addr) ~/tmp/payment.skey ~/tmp/cold.skey ~/tmp/cold.vkey ~/tmp/poll-answer.json
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
 
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
+else
+    echo "ERROR: $ERROR"
+    exit 1
+fi
 
+IS_AIR_GAPPED=0
+if [[ $NODE_TYPE == "airgap" ]]; then
+    # checking we're in an air-gapped environment
+    if ping -q -c 1 -W 1 google.com >/dev/null; then
+        echo "The network is up"
+    else
+        echo "The network is down"
+    fi
 
-# https://github.com/gitmachtl/scripts/blob/master/cardano/testnet/13b_sendSpoPoll.sh
+    IS_AIR_GAPPED=$(check_air_gap)
 
+    if [[ $IS_AIR_GAPPED == 1 ]]; then
+        echo "we are air-gapped"
+    else
+        echo "we are online"
+    fi
+fi
 
-# dummyRequiredHash="12345678901234567890123456789012345678901234567890123456"
-# ${cardanocli} transaction build-raw 
-#     ${nodeEraParam} 
-#     ${txInString} 
-#     --tx-out "${sendToAddr}+1000000${assetsOutString}" 
-#     --invalid-hereafter ${ttl} 
-#     --fee 0 
-#     ${metafileParameter} 
-#     --required-signer-hash ${dummyRequiredHash} 
-#     --out-file ${txBodyFile}
+# getting the script state ready
+STATE_FILE="$HOME/spot.state"
 
-# ${cardanocli} transaction build-raw
-#     ${nodeEraParam}
-#     ${txInString}
-#     --tx-out "${sendToAddr}+1000000${assetsOutString}"
-#     --tx-out ${sendToAddr}+1000000
-#     --invalid-hereafter ${ttl}
-#     --fee 0
-#     ${metafileParameter}
-#     --required-signer-hash ${dummyRequiredHash} 
-#     --out-file ${txBodyFile}
+if [ -f "$STATE_FILE" ]; then
+    # Source the state file to restore state
+    . "$STATE_FILE" 2>/dev/null || :
+else
+    touch $STATE_FILE
+    STATE_STEP_ID=0
+    STATE_SUB_STEP_ID="build.trans"
+    STATE_LAST_DATE="never"
+    STATE_TRANS_WORK_DIR=""
+    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+fi
 
-# fee=$(${cardanocli} transaction calculate-min-fee 
-#         --tx-body-file ${txBodyFile}
-#         --protocol-params-file <(echo ${protocolParametersJSON})
-#         --tx-in-count ${txcnt}
-#         --tx-out-count ${rxcnt} 
-#         ${magicparam}
-#         --witness-count 2 --byron-witness-count 0 | awk '{ print $1 }')
+print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
 
-# #Generate Dummy-TxBody file for fee calculation
-# dummyRequiredHash="12345678901234567890123456789012345678901234567890123456"
-
-
-# ${cardanocli} transaction build-raw 
-#     ${nodeEraParam}
-#     ${txInString}
-#     --tx-out "${sendToAddr}+${lovelacesToSend}${assetsOutString}"
-#     --invalid-hereafter ${ttl}
-#     --fee ${fee}
-#     ${metafileParameter}
-#     --required-signer-hash ${vkeyNodeHash}
-#     --out-file ${txBodyFile}
-
-# ${cardanocli} transaction sign
-#     --tx-body-file ${txBodyFile}
-#         --signing-key-file <(echo "${skeyJSON}")
-#         --signing-key-file <(echo "${skeyNodeJSON}") 
-#         ${magicparam} --out-file ${txFile}
-
-
-# if [[ ${rxcnt} == 1 ]]; then  #Sending ALLFUNDS or sending ALL lovelaces and no assets on the address
-#                         ${cardanocli} transaction build-raw ${nodeEraParam} ${txInString} --tx-out "${sendToAddr}+1000000${assetsOutString}" --invalid-hereafter ${ttl} --fee 0 ${metafileParameter} --required-signer-hash ${dummyRequiredHash} --out-file ${txBodyFile}
-# 			checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
-#                         else  #Sending chosen amount of lovelaces or ALL lovelaces but return the assets to the address
-#                         ${cardanocli} transaction build-raw ${nodeEraParam} ${txInString} --tx-out "${sendToAddr}+1000000${assetsOutString}" --tx-out ${sendToAddr}+1000000 --invalid-hereafter ${ttl} --fee 0 ${metafileParameter} --required-signer-hash ${dummyRequiredHash} --out-file ${txBodyFile}
-# 			checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
-# 	fi
-# fee=$(${cardanocli} transaction calculate-min-fee --tx-body-file ${txBodyFile} --protocol-params-file <(echo ${protocolParametersJSON}) --tx-in-count ${txcnt} --tx-out-count ${rxcnt} ${magicparam} --witness-count 2 --byron-witness-count 0 | awk '{ print $1 }')
-# checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
-
-# #read the needed signing keys into ram
-# echo
-# skeyNodeJSON=$(read_skeyFILE "${nodeName}.node.skey"); if [ $? -ne 0 ]; then echo -e "\e[35m${skeyNodeJSON}\e[0m\n"; exit 1; else echo -e "\e[32mOK\e[0m\n"; fi
-# vkeyNodeHash=$(${cardanocli} key verification-key  --signing-key-file <(echo "${skeyNodeJSON}") --verification-key-file /dev/stdout | jq -r .cborHex | tail -c +5 | xxd -r -ps | b2sum -l 224 -b | cut -d' ' -f 1)
-# echo -e "\e[0mBuilding the VKEY-Hash (Pool-ID) for the required signer field: \e[32m${vkeyNodeHash}\e[0m"
-
-# echo
-# echo -e "\e[0mBuilding the unsigned transaction body: \e[32m ${txBodyFile} \e[90m"
-# echo
-
-# #Building unsigned transaction body
-# rm ${txBodyFile} 2> /dev/null
-# if [[ ${rxcnt} == 1 ]]; then  #Sending ALL funds  (rxcnt=1)
-# 			${cardanocli} transaction build-raw ${nodeEraParam} ${txInString} --tx-out "${sendToAddr}+${lovelacesToSend}${assetsOutString}" --invalid-hereafter ${ttl} --fee ${fee} ${metafileParameter} --required-signer-hash ${vkeyNodeHash} --out-file ${txBodyFile}
-# 			checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
-# 			else  #Sending chosen amount (rxcnt=2), return the rest(incl. assets)
-# 			${cardanocli} transaction build-raw ${nodeEraParam} ${txInString} --tx-out ${sendToAddr}+${lovelacesToSend} --tx-out "${sendFromAddr}+${lovelacesToReturn}${assetsOutString}" --invalid-hereafter ${ttl} --fee ${fee} ${metafileParameter} --required-signer-hash ${vkeyNodeHash} --out-file ${txBodyFile}
-# 			#echo -e "\n\n\n${cardanocli} transaction build-raw ${nodeEraParam} ${txInString} --tx-out ${sendToAddr}+${lovelacesToSend} --tx-out \"${sendFromAddr}+${lovelacesToReturn}${assetsOutString}\" --invalid-hereafter ${ttl} --fee ${fee} --out-file ${txBodyFile}\n\n\n"
-# 			checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
+# To prepare COLD_VKEY_HASH run either of these 2 commands on your airgap environment
+# cardano-cli stake-pool id --cold-verification-key-file $COLD_VKEY_FILE --output-format hex > pool.hex.id
+# OR
+# vkeyNodeHash=$(cat $COLD_VKEY_FILE | jq -r .cborHex | tail -c +5 | xxd -r -ps | b2sum -l 224 -b | cut -d' ' -f 1)
 
 
-# #Sign the unsigned transaction body with the SecureKey
+if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
+    cd ~
 
-# 	#read the needed signing keys into ram and sign the transaction
-# 	skeyJSON=$(read_skeyFILE "${fromAddr}.skey"); if [ $? -ne 0 ]; then echo -e "\e[35m${skeyJSON}\e[0m\n"; exit 1; else echo -e "\e[32mOK\e[0m\n"; fi
+    URL="https://raw.githubusercontent.com/cardano-foundation/CIP-0094-polls/main/networks/mainnet/${VOTE_TX_HASH}/poll.json"
+    wget $URL
 
-# 	echo -e "\e[0mSign the unsigned transaction body with the \e[32m${fromAddr}.skey\e[0m and \e[32m${nodeName}.node.skey\e[0m: \e[32m ${txFile}\e[0m"
-# 	echo
+    cardano-cli governance answer-poll --poll-file poll.json > poll-answer.json
 
-#         ${cardanocli} transaction sign --tx-body-file ${txBodyFile} --signing-key-file <(echo "${skeyJSON}") --signing-key-file <(echo "${skeyNodeJSON}") ${magicparam} --out-file ${txFile}
-# 	checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
+    echo "STARTING THE VOTE TRANSACTION PROCESS..."
 
-# 	#forget the signing keys
-# 	unset skeyJSON skeyNodeJSON
+    $SPOT_DIR/scripts/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) NONE NONE NONE $HOME/poll-answer.json $COLD_VKEY_HASH
+elif [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 ]]; then
 
+    $SPOT_DIR/scripts/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $HOME/keys/payment.skey $HOME/cold_keys/cold.skey $HOME/cold_keys/cold.vkey NONE NONE
 
+elif [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
-# #Do a txSize Check to not exceed the max. txSize value
-# cborHex=$(jq -r .cborHex < ${txFile})
-# txSize=$(( ${#cborHex} / 2 ))
-# maxTxSize=$(jq -r .maxTxSize <<< ${protocolParametersJSON})
-# if [[ ${txSize} -le ${maxTxSize} ]]; then echo -e "\e[0mTransaction-Size: ${txSize} bytes (max. ${maxTxSize})\n"
-#                                      else echo -e "\n\e[35mError - ${txSize} bytes Transaction-Size is too big! The maximum is currently ${maxTxSize} bytes.\e[0m\n"; exit 1; fi
+    $SPOT_DIR/scripts/create_transaction.sh NONE NONE NONE NONE NONE NONE
 
-# #Submit the tx
-# echo -ne "\e[0mSubmitting the transaction via the node... "
-# ${cardanocli} transaction submit --tx-file ${txFile} ${magicparam}
-# checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi
-# echo -e "\e[32mDONE\n"
+fi
 
-# #Show the TxID
-# txID=$(${cardanocli} transaction txid --tx-file ${txFile}); echo -e "\e[0m TxID is: \e[32m${txID}\e[0m"
-# checkError "$?"; if [ $? -ne 0 ]; then exit $?; fi;
-# if [[ "${transactionExplorer}" != "" ]]; then echo -e "\e[0mTracking: \e[32m${transactionExplorer}/${txID}\n\e[0m"; fi
+echo "VOTING PROCESS COMPLETE."

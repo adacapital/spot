@@ -12,11 +12,14 @@ TOPO_FILE=~/pool_topology
 # importing utility functions
 source $NS_PATH/utils.sh
 
-if [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
+# TODO: there are 2 prototypes expecting 6 params! :)
+if [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == ""  && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=""; LOVELACE_AMOUNT=0; SKEY_FILE=$2; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=$3; COLD_VKEY_FILE=$4; POOL_CERT_FILE=""; DELEGATION_CERT_FILE=""; VOTE_METADATA_JSON=$5; COLD_VKEY_HASH=$6;
+elif [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
 elif [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; STAKE_CERT_FILE=$6; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
 elif [[ $# -eq 8 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" && ! $7 == "" && ! $8 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; COLD_KEY_FILE=$6; POOL_CERT_FILE=$7; DELEGATION_CERT_FILE=$8; STAKE_CERT_FILE="";
 else 
     echo -e "This script requires input parameters:\n\tUsages:"
+    echo -e "\t\t$0 {source_payment_addr} {pay sign key file} {pool cold vkey file} {pool cold skey file} {vote metadata json file} {pool cold.vkey hash}"
     echo -e "\t\t$0 {source_payment_addr} {dest_payment_addr} {lovelace}"
     echo -e "\t\t$0 {source_payment_addr} {dest_payment_addr} {lovelace} {sign key file}"
     echo -e "\t\t$0 {source_payment_addr} {dest_payment_addr} {lovelace} {sign key file} {stake sign key file} {stake certificate file}"
@@ -97,6 +100,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     if [[ $COLD_KEY_FILE != "" ]]; then echo -e "Cold Key file:\t$COLD_KEY_FILE"; fi
     if [[ $POOL_CERT_FILE != "" ]]; then echo -e "Pool certificate file:\t$POOL_CERT_FILE"; fi
     if [[ $DELEGATION_CERT_FILE != "" ]]; then echo -e "Delegation certificate file:\t$DELEGATION_CERT_FILE"; fi
+    if [[ $VOTE_METADATA_JSON != "" ]]; then echo -e "Vote metadata json file:\t$VOTE_METADATA_JSON"; fi
     if ! promptyn "Please confirm you want to proceed? (y/n)"; then
         echo "Ok bye!"
         exit 1
@@ -127,22 +131,56 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
     echo "Source payment address UTXOs:"
     cat utxos.out
+    rm -f assets.out
+    touch assets.out
 
     TX_IN=""
     TOTAL_BALANCE=0
+    TOTAL_ASSETS=""
     while read -r UTXO; do
         UTXO_HASH=$(awk '{ print $1 }' <<< "${UTXO}")
         UTXO_TXIX=$(awk '{ print $2 }' <<< "${UTXO}")
         UTXO_BALANCE=$(awk '{ print $3 }' <<< "${UTXO}")
+        UTXO_ASSETS=$(awk -F'lovelace' '{print $2}' <<< "${UTXO}")
+        if [[ ! $UTXO_ASSETS == " + TxOutDatumNone" ]]; then
+            # UTXO_ASSETS="toto"
+            SPLITTED="$(sed "s/ + /\n/g" <<< "$UTXO_ASSETS")"
+            readarray -t ARRAY <<< "$SPLITTED"
+
+            if [[ ${#ARRAY[@]} -gt 2 ]]; then
+                for a in "${ARRAY[@]}"; do
+                    if [[ ! $a == "" && ! $a == "TxOutDatumNone" ]]; then
+                        # echo "> '$a'"
+                        ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$a")
+                        ASSET_POLICY=$(awk '{ print $2 }' <<< "$a")
+                        echo "{\"amount\": $ASSET_AMOUNT, \"policy\": \"$ASSET_POLICY\"}" >> assets.out
+                    fi
+                done
+            fi
+        else
+            UTXO_ASSETS=""
+        fi
         TOTAL_BALANCE=$((${TOTAL_BALANCE}+${UTXO_BALANCE}))
         echo "TxIn: ${UTXO_HASH}#${UTXO_TXIX}"
         echo "Lovelace: ${UTXO_BALANCE}"
+        echo "Assets: ${UTXO_ASSETS}"
         TX_IN="${TX_IN} --tx-in ${UTXO_HASH}#${UTXO_TXIX}"
     done < utxos.out
     TXCNT=$(cat utxos.out | wc -l)
     echo "Total lovelace balance: $TOTAL_BALANCE"
     echo "UTXO count: $TXCNT"
     echo "TX_IN: $TX_IN"
+
+    cat assets.out | jq -s 'group_by(.policy) | map({policy: .[0].policy, amount: map(.amount) | add})' | jq -r '.[] | "\(.amount)\t\(.policy)"' > assets2.out
+    while read -r ASSET; do
+        ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$ASSET")
+        ASSET_POLICY=$(awk '{ print $2 }' <<< "$ASSET")
+        if [[ ! $TOTAL_ASSETS == "" ]]; then
+            TOTAL_ASSETS="${TOTAL_ASSETS} + "
+        fi
+        TOTAL_ASSETS="${TOTAL_ASSETS}${ASSET_AMOUNT} ${ASSET_POLICY}"
+    done < assets2.out
+    echo "TOTAL_ASSETS: ${TOTAL_ASSETS}"
 
     if [[ $TX_IN == "" ]]; then
         echo "ERROR: Cannot create transaction, Empty UTXO in SOURCE_PAYMENT_ADDR: $SOURCE_PAYMENT_ADDR"
@@ -153,10 +191,12 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     # calculate the number of output to the transaction
     TXOCNT=2
     if [[ $DEST_PAYMENT_ADDR == $SOURCE_PAYMENT_ADDR ]]; then TXOCNT=1; fi
+    if [[ $VOTE_METADATA_JSON != "" ]]; then TXOCNT=1; fi
 
     # calculate the number of witness to the transaction
     WITCNT=1
     if [[ $STAKE_CERT_FILE != "" ]]; then WITCNT=2; fi
+    if [[ $VOTE_METADATA_JSON != "" ]]; then WITCNT=2; fi
     if [[ $DELEGATION_CERT_FILE != "" ]]; then WITCNT=3; fi
 
     echo "TXOCNT: $TXOCNT"
@@ -164,7 +204,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
     # draft the transaction
     if [[ $TXOCNT -eq 1 ]]; then
-        if [[ $STAKE_CERT_FILE == "" && $DELEGATION_CERT_FILE == "" ]]; then
+        if [[ $STAKE_CERT_FILE == "" && $DELEGATION_CERT_FILE == "" && $VOTE_METADATA_JSON == "" ]]; then
             echo "Creating a draft standard transaction with 1 output"
 
             cardano-cli transaction build-raw \
@@ -194,6 +234,19 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
             --out-file tx.raw.draft \
             --certificate-file $POOL_CERT_FILE \
             --certificate-file $DELEGATION_CERT_FILE
+        elif [[ $VOTE_METADATA_JSON != "" ]]; then
+            echo "Creating a draft stake pool vote transaction"
+            dummyRequiredHash="12345678901234567890123456789012345678901234567890123456"
+
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $SOURCE_PAYMENT_ADDR+0 \
+            --json-metadata-detailed-schema \
+            --metadata-json-file $VOTE_METADATA_JSON \
+            --ttl 0 \
+            --fee 0 \
+            --required-signer-hash ${dummyRequiredHash} \
+            --out-file tx.raw.draft
         fi
     else
         echo "Creating a draft standard transaction with 2 outputs"
@@ -216,6 +269,10 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     --byron-witness-count 0 \
     --mainnet \
     --protocol-params-file protocol.json | awk '{print $1}')
+
+    echo "TOTAL_BALANCE: ${TOTAL_BALANCE}"
+    echo "LOVELACE_AMOUNT: ${LOVELACE_AMOUNT}"
+    echo "FEE: ${FEE}"
 
     UTXO_LOVELACE_BALANCE_FINAL=$(expr $TOTAL_BALANCE - $LOVELACE_AMOUNT - $FEE)
 
@@ -289,14 +346,25 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
     elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]; then
         echo "Creating a stake pool registration transaction"
 
-        cardano-cli transaction build-raw \
-        $TX_IN \
-        --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
-        --ttl $TTL \
-        --fee $FEE \
-        --out-file tx.raw \
-        --certificate-file $POOL_CERT_FILE \
-        --certificate-file $DELEGATION_CERT_FILE
+        if [[ $TOTAL_ASSETS == "" ]]; then
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw \
+            --certificate-file $POOL_CERT_FILE \
+            --certificate-file $DELEGATION_CERT_FILE
+        else
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw \
+            --certificate-file $POOL_CERT_FILE \
+            --certificate-file $DELEGATION_CERT_FILE
+        fi
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
@@ -315,7 +383,52 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 mkdir -p \$HOME/transactions/$now
 mv tx.raw \$HOME/transactions/$now
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+
+    elif [[ $TXOCNT -eq 1 && $VOTE_METADATA_JSON != "" ]]; then
+        echo "Creating a stake pool vote transaction"
+
+  
+        if [[ $TOTAL_ASSETS == "" ]]; then
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $SOURCE_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+            --ttl $TTL \
+            --fee $FEE \
+            --json-metadata-detailed-schema \
+            --metadata-json-file $VOTE_METADATA_JSON \
+            --required-signer-hash $COLD_VKEY_HASH \
+            --out-file tx.raw
+        else
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $SOURCE_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
+            --ttl $TTL \
+            --fee $FEE \
+            --json-metadata-detailed-schema \
+            --metadata-json-file $VOTE_METADATA_JSON \
+            --required-signer-hash $COLD_VKEY_HASH \
+            --out-file tx.raw
+        fi
+
+        STATE_SUB_STEP_ID="sign.trans"
+        STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
+        STATE_TRANS_WORK_DIR="transactions/$now"
+        save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
+
+        # copy certain files back to the air-gapped environment to continue operation there
+        STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+        echo
+        echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
+        echo $STATE_FILE
+        echo $CUR_DIR/tx.raw
+        echo $STATE_APPLY_SCRIPT
+
+        echo "#!/bin/bash
+mkdir -p \$HOME/transactions/$now
+mv tx.raw \$HOME/transactions/$now
+echo \"state applied, please now run spo_poll_vote.sh\"" > $STATE_APPLY_SCRIPT
     fi
+
 fi
 
 if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 ]]; then
@@ -324,6 +437,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
     # calculate the number of witness to the transaction
     WITCNT=1
     if [[ $STAKE_CERT_FILE != "" ]]; then WITCNT=2; fi
+    if [[ $VOTE_METADATA_JSON != "" ]]; then WITCNT=2; fi
     if [[ $DELEGATION_CERT_FILE != "" ]]; then WITCNT=3; fi
 
     CUR_DIR=$HOME/$STATE_TRANS_WORK_DIR
@@ -339,14 +453,25 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         --mainnet \
         --out-file tx.signed
     elif [[ $WITCNT -eq 2 ]]; then
-        echo "Signing the transaction with two witnesses"
+        if [[ $VOTE_METADATA_JSON != "" ]]; then
+            echo "Signing the vote transaction with two witnesses"
 
-        cardano-cli transaction sign \
-        --tx-body-file tx.raw \
-        --signing-key-file $SKEY_FILE \
-        --signing-key-file $SKEY_FILE_STAKE \
-        --mainnet \
-        --out-file tx.signed
+            cardano-cli transaction sign \
+            --tx-body-file tx.raw \
+            --signing-key-file $SKEY_FILE \
+            --signing-key-file $COLD_KEY_FILE \
+            --mainnet \
+            --out-file tx.signed
+        else
+            echo "Signing the transaction with two witnesses"
+
+            cardano-cli transaction sign \
+            --tx-body-file tx.raw \
+            --signing-key-file $SKEY_FILE \
+            --signing-key-file $SKEY_FILE_STAKE \
+            --mainnet \
+            --out-file tx.signed
+        fi
 
         STATE_SUB_STEP_ID="submit.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
@@ -364,6 +489,11 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
             echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
         fi
 
+        ACTION="init_stake.sh"
+        if [[ $VOTE_METADATA_JSON != "" ]]; then
+            ACTION="spo_poll_vote.sh"
+        fi
+
         # copy certain files to usb key to continue operations on bp node
         cp $STATE_FILE $SPOT_USB_KEY
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
@@ -371,7 +501,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         echo "#!/bin/bash
 mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
 mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
-echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
+echo \"state applied, please now run $ACTION\"" > $STATE_APPLY_SCRIPT
 
         echo
         echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
@@ -439,6 +569,11 @@ if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
     else
         echo $res
         echo "Transaction sent!"
+
+         #Show the TxID
+        TX_ID=$(cardanocli transaction txid --tx-file tx.signed); 
+        echo -e "\e[0m TxID is: \e[32m${txID}\e[0m"
+        echo $TX_ID > tx.id
 
         STATE_SUB_STEP_ID="completed.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
