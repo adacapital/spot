@@ -73,7 +73,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
             # POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeMark": )\d+(?=,?)')
             # ACTIVE_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "activeStakeMark": )\d+(?=,?)')
 
-            IFS=$'\t' read -r -a stakeValues <<< "$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --mainnet | jq --arg pool_id "$POOL_ID" -r '[.pools[$pool_id].stakeMark, .total.stakeMark] | @tsv')"
+            IFS=$'\t' read -r -a stakeValues <<< "$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC | jq --arg pool_id "$POOL_ID" -r '[.pools[$pool_id].stakeMark, .total.stakeMark] | @tsv')"
 
             POOL_STAKE="${stakeValues[0]}"
             ACTIVE_STAKE="${stakeValues[1]}"
@@ -81,7 +81,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
             # POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeSet": )\d+(?=,?)')
             # ACTIVE_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "activeStakeSet": )\d+(?=,?)')
 
-            IFS=$'\t' read -r -a stakeValues <<< "$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --mainnet | jq --arg pool_id "$POOL_ID" -r '[.pools[$pool_id].stakeSet, .total.stakeSet] | @tsv')"
+            IFS=$'\t' read -r -a stakeValues <<< "$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC | jq --arg pool_id "$POOL_ID" -r '[.pools[$pool_id].stakeSet, .total.stakeSet] | @tsv')"
 
             POOL_STAKE="${stakeValues[0]}"
             ACTIVE_STAKE="${stakeValues[1]}"
