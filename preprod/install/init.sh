@@ -136,7 +136,7 @@ echo '---------------- Installing Libsodium ----------------'
 cd ~/download/
 git clone https://github.com/input-output-hk/libsodium
 cd libsodium
-git checkout 66f017f1
+git checkout dbb48cc
 ./autogen.sh
 ./configure
 make

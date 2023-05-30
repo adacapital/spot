@@ -79,7 +79,7 @@ echo '---------------- Installing Libsodium ----------------'
 cd ~/download/
 git clone https://github.com/input-output-hk/libsodium
 cd libsodium
-git checkout 66f017f1
+git checkout dbb48cc
 ./autogen.sh
 ./configure
 make
@@ -155,6 +155,8 @@ wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-dep
 wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-shelley-genesis.json
 wget -O agenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-alonzo-genesis.json
 wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/testnet-topology.json
+wget -O cgenesis.json https://raw.githubusercontent.com/input-output-hk/cardano-world/8.x-integration/nix/cardano/environments/preview/conway-genesis.json
+
 sed -i 's/"TraceBlockFetchDecisions": false/"TraceBlockFetchDecisions": true/g' config.json
 sed -i 's/testnet-byron-genesis/bgenesis/g' config.json
 sed -i 's/testnet-shelley-genesis/sgenesis/g' config.json

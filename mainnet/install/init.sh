@@ -146,7 +146,7 @@ echo '---------------- Installing Libsodium ----------------'
 cd ~/download/
 git clone https://github.com/input-output-hk/libsodium
 cd libsodium
-git checkout 66f017f1
+git checkout dbb48cc
 ./autogen.sh
 ./configure
 make
@@ -227,6 +227,7 @@ wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-dep
 wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-shelley-genesis.json
 wget -O agenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-alonzo-genesis.json
 wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-topology.json
+wget -O cgenesis.json https://raw.githubusercontent.com/input-output-hk/cardano-world/8.x-integration/nix/cardano/environments/mainnet/conway-genesis.json
 
 # prepare config.json
 
