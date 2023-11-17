@@ -15,8 +15,8 @@ resource "oci_core_subnet" "adact_preprod_bp_subnet" {
 #   security_list_ids = [oci_core_security_list.ampere_security_list.id]
   compartment_id    = var.tenancy_ocid
   vcn_id            = oci_core_vcn.adact_preprod_vcn.id
-  # route_table_id    = oci_core_route_table.adact_preprod_route_table.id
-  route_table_id    = oci_core_route_table.adact_preprod_bp_route_table.id  # Updated to use the new route table
+  route_table_id    = oci_core_route_table.adact_preprod_route_table.id # default when bp has public ip
+  # route_table_id    = oci_core_route_table.adact_preprod_bp_route_table.id  # Updated to use the new route table
   dhcp_options_id   = oci_core_vcn.adact_preprod_vcn.default_dhcp_options_id
 }
 

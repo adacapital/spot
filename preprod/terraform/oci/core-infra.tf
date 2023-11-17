@@ -84,13 +84,13 @@ resource "oci_core_network_security_group_security_rule" "nsg_bp_egress_rule" {
 
 # Ingress Security Rule for SSH from relay_node_vm_1 and relay_node_vm_2 internal IPs
 resource "oci_core_network_security_group_security_rule" "nsg_bp_ingress_ssh_rule" {
-    count = length(local.bp_node_ssh_source_ips)
+    count = length(local.bp_node_ssh_source_ips_ssh)
 
   network_security_group_id = oci_core_network_security_group.nsg_bp_node.id
 
   direction     = "INGRESS"
   protocol      = "6"
-  source        = element(local.bp_node_ssh_source_ips, count.index)
+  source        = element(local.bp_node_ssh_source_ips_ssh, count.index)
   stateless = false
 
     tcp_options {
@@ -100,7 +100,7 @@ resource "oci_core_network_security_group_security_rule" "nsg_bp_ingress_ssh_rul
     }
     }
 
-    depends_on = [oci_core_instance.relay_node_vm_1, oci_core_instance.relay_node_vm_2]
+    depends_on = [oci_core_instance.relay_node_vm_1, oci_core_instance.relay_node_vm_2, oci_core_instance.block_producing_node_vm]
 }
 
 # Ingress Security Rule for port 3000 from relay_node_vm_1 and relay_node_vm_2 internal IPs
@@ -351,9 +351,9 @@ output "bp_node_vm_private_ip" {
   value = oci_core_instance.block_producing_node_vm.private_ip
 }
 
-# output "bp_node_vm_public_ip" {
-#   value = oci_core_instance.block_producing_node_vm.public_ip
-# }
+output "bp_node_vm_public_ip" {
+  value = oci_core_instance.block_producing_node_vm.public_ip
+}
 
 output "relay1_node_vm_private_ip" {
   value = oci_core_instance.relay_node_vm_1.private_ip

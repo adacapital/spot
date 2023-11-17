@@ -114,7 +114,7 @@ variable "public_ip" {
   description = "Flag to assign a public IP"
   type        = map(bool)
   default     = {
-    "block_producing_node_vm" = false
+    "block_producing_node_vm" = true
     "relay_node_vm_1"         = true
     "relay_node_vm_2"         = true
   }
