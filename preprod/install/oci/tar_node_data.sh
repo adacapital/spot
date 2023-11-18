@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# ./spot/preprod/install/oci/tar_node_data.sh -node_type node.bp -root_path /home/cardano
+# scp file
+# tar -xzvf /target/node_archive.tar.gz -C /target
+
 # Initialize variables
 node_type=""
 root_path=""
