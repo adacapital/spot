@@ -12,8 +12,6 @@ echo "ROOT_DIR: $ROOT_DIR"
 echo "CONF_PATH: $CONF_PATH"
 echo
 
-exit 1
-
 # importing utility functions
 source $ROOT_DIR/scripts/utils.sh
 
