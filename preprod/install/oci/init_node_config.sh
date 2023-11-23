@@ -211,6 +211,18 @@ sudo apt-get install firewalld
 sudo systemctl enable firewalld
 sudo systemctl start firewalld 
 
-sudo firewall-cmd --zone=public --add-port=3001/tcp --permanent
-sudo firewall-cmd --reload
-sudo firewall-cmd --list-all
+if [ "$NODE_TYPE" == "relay" ]; then
+    echo "Configuring for relay node..."
+    sudo firewall-cmd --zone=public --add-port=3001/tcp --permanent
+    sudo firewall-cmd --reload
+    sudo firewall-cmd --list-all
+
+elif [ "$NODE_TYPE" == "bp" ]; then
+    echo "Configuring for bp node..."
+    sudo firewall-cmd --zone=public --add-port=3000/tcp --permanent
+    sudo firewall-cmd --reload
+    sudo firewall-cmd --list-all
+
+else
+    echo "NODE_TYPE is not set to 'relay' or 'bp'. No changes made."
+fi
