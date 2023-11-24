@@ -4,19 +4,25 @@
 # We're ok here as we're only playing with TESTNET.
 
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
-# CLI_PATH=/home/cardano/.local/bin/
-CLI_PATH=${HOME}/.local/bin/CIP-0094
+TOPO_FILE=$ROOT_PATH/pool_topology
+CLI_PATH=/home/cardano/.local/bin/
+# CLI_PATH=${HOME}/.local/bin/CIP-0094
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 echo "CLI_PATH: $CLI_PATH"
 
 # importing utility functions
 source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
 
 if [[ $# -eq 5 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=""; LOVELACE_AMOUNT=0; SKEY_FILE=$2; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=$3; COLD_VKEY_FILE=$4; POOL_CERT_FILE=""; DELEGATION_CERT_FILE=""; VOTE_METADATA_JSON=$5;
 elif [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE=""; VOTE_METADATA_JSON="";
@@ -31,6 +37,7 @@ else
     exit 2
 fi
 
+echo
 echo -e "Sending:\t\t$LOVELACE_AMOUNT lovelace"
 echo -e "From address:\t\t$SOURCE_PAYMENT_ADDR"
 echo -e "To address:\t\t$DEST_PAYMENT_ADDR"
@@ -46,11 +53,17 @@ if ! promptyn "Please confirm you want to proceed? (y/n)"; then
     exit 1
 fi
 
+echo
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
+
 # create working directory for the transaction
-mkdir -p ~/transactions
-cd ~/transactions
-mkdir $now
-cd $now
+mkdir -p $ROOT_PATH/transactions
+cd $ROOT_PATH/transactions
+mkdir $NOW
+cd $NOW
 CUR_DIR=`pwd`
 
 # get protocol parameters
@@ -69,6 +82,7 @@ UTXO_RAW=$($NS_PATH/query_payment_addr.sh $SOURCE_PAYMENT_ADDR > query_payment_a
 
 tail -n +3 query_payment_addr.out | sort -k3 -nr > utxos.out
 
+echo
 echo "Source payment address UTXOs:"
 cat utxos.out
 rm -f assets.out
@@ -101,12 +115,14 @@ while read -r UTXO; do
         UTXO_ASSETS=""
     fi
     TOTAL_BALANCE=$((${TOTAL_BALANCE}+${UTXO_BALANCE}))
+    echo
     echo "TxIn: ${UTXO_HASH}#${UTXO_TXIX}"
     echo "Lovelace: ${UTXO_BALANCE}"
     echo "Assets: ${UTXO_ASSETS}"
     TX_IN="${TX_IN} --tx-in ${UTXO_HASH}#${UTXO_TXIX}"
 done < utxos.out
 TXCNT=$(cat utxos.out | wc -l)
+echo
 echo "Total lovelace balance: $TOTAL_BALANCE"
 echo "UTXO count: $TXCNT"
 echo "TX_IN: $TX_IN"
@@ -120,6 +136,7 @@ while read -r ASSET; do
     fi
     TOTAL_ASSETS="${TOTAL_ASSETS}${ASSET_AMOUNT} ${ASSET_POLICY}"
 done < assets2.out
+echo
 echo "TOTAL_ASSETS: ${TOTAL_ASSETS}"
 
 
@@ -143,6 +160,7 @@ if [[ $DELEGATION_CERT_FILE != "" ]]; then WITCNT=3; fi
 echo "TXOCNT: $TXOCNT"
 echo "WITCNT: $WITCNT"
 
+echo
 # draft the transaction
 if [[ $TXOCNT -eq 1 ]]; then
     if [[ $STAKE_CERT_FILE == "" && $DELEGATION_CERT_FILE == "" && $VOTE_METADATA_JSON == "" ]]; then
@@ -187,7 +205,7 @@ if [[ $TXOCNT -eq 1 ]]; then
         --ttl 0 \
         --fee 0 \
         --required-signer-hash ${dummyRequiredHash} \
-        --out-file ~/tmp/tx.raw.draft
+        --out-file tx.raw.draft
     fi
 else
     echo "Creating a draft standard transaction with 2 outputs"
@@ -203,7 +221,7 @@ fi
 
 # calculate the transaction fee and the final balance for SOURCE_PAYMENT_ADDR
 FEE=$(${CLI_PATH}/cardano-cli transaction calculate-min-fee \
-   --tx-body-file ~/tmp/tx.raw.draft \
+   --tx-body-file tx.raw.draft \
    --tx-in-count ${TXCNT} \
    --tx-out-count ${TXOCNT} \
    --witness-count ${WITCNT} \
@@ -233,19 +251,30 @@ fi
 echo "FEE: $FEE"
 echo "UTXO_LOVELACE_BALANCE_FINAL: $UTXO_LOVELACE_BALANCE_FINAL"
 
+echo
 # build the transaction
 if [[ $TXOCNT -eq 2 ]]; then
     echo "Creating a standard transaction between 2 addresses"
 
     if [[ $UTXO_LOVELACE_BALANCE_FINAL -gt 0 ]];
     then
-        ${CLI_PATH}/cardano-cli transaction build-raw \
-        $TX_IN \
-        --tx-out $DEST_PAYMENT_ADDR+$LOVELACE_AMOUNT \
-        --tx-out $SOURCE_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
-        --ttl $TTL \
-        --fee $FEE \
-        --out-file tx.raw
+        if [[ $TOTAL_ASSETS == "" ]]; then
+            ${CLI_PATH}/cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$LOVELACE_AMOUNT \
+            --tx-out $SOURCE_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw
+        else
+            ${CLI_PATH}/cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$LOVELACE_AMOUNT \
+            --tx-out $SOURCE_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw
+        fi
     else
         # only one output here as SOURCE_PAYMENT_ADDR's balance going to 0
         ${CLI_PATH}/cardano-cli transaction build-raw \
@@ -300,9 +329,10 @@ elif [[ $TXOCNT -eq 1 && $VOTE_METADATA_JSON != "" ]]; then
     --json-metadata-detailed-schema \
     --metadata-json-file $VOTE_METADATA_JSON \
     --required-signer-hash ${vkeyNodeHash} \
-    --out-file ~/tmp/tx.raw
+    --out-file tx.raw
 fi
 
+echo
 # sign the transaction
 if [[ $WITCNT -eq 1 ]]; then
     echo "Signing the transaction with one witness"
@@ -316,11 +346,11 @@ elif [[ $WITCNT -eq 2 ]]; then
     if [[ $VOTE_METADATA_JSON != "" ]]; then
         echo "Signing the vote transaction with two witnesses"
         ${CLI_PATH}/cardano-cli transaction sign \
-        --tx-body-file ~/tmp/tx.raw \
+        --tx-body-file tx.raw \
         --signing-key-file $SKEY_FILE \
         --signing-key-file $COLD_KEY_FILE \
         --testnet-magic $MAGIC \
-        --out-file ~/tmp/tx.signed
+        --out-file tx.signed
     else
         echo "Signing the transaction with two witnesses"
         ${CLI_PATH}/cardano-cli transaction sign \
@@ -342,9 +372,10 @@ elif [[ $WITCNT -eq 3 ]]; then
     --out-file tx.signed
 fi
 
+echo
 # submit the transaction
 ${CLI_PATH}/cardano-cli transaction submit \
---tx-file ~/tmp/tx.signed \
+--tx-file tx.signed \
 --testnet-magic $MAGIC
 
 TXID=$(${CLI_PATH}/cardano-cli transaction txid --tx-file ./tx.signed)

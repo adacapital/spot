@@ -10,13 +10,19 @@ fi
 NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -41,6 +47,11 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
 
 if [[ $NODE_TYPE == "bp" ]]; then
     CNCLI_STATUS=$($NS_PATH/cncli_status.sh | jq -r .status)
@@ -68,7 +79,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     if [[ $CNCLI_STATUS == "ok" ]]; then
         echo "CNCLI database is synced."
 
-        SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC)
+        # SNAPSHOT=$(cardano-cli query stake-snapshot --stake-pool-id $POOL_ID --testnet-magic $MAGIC)
 
         if [[ $EPOCH == "next" ]]; then
             # POOL_STAKE=$(echo "$SNAPSHOT" | grep -oP '(?<=    "poolStakeMark": )\d+(?=,?)')

@@ -2,17 +2,24 @@
 # Beware, in a real life scenario (MAINNET), you need to have your keys under cold storage.
 # Signing a transaction need to happen in your air-gapped environement.
 
+
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
 
 if [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
 elif [[ $# -eq 6 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" && ! $6 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=$5; STAKE_CERT_FILE=$6; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE="";
@@ -48,6 +55,11 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
 
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
@@ -105,10 +117,10 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     fi
 
     # create working directory for the transaction
-    mkdir -p ~/transactions
-    cd ~/transactions
-    mkdir $now
-    cd $now
+    mkdir -p $ROOT_PATH/transactions
+    cd $ROOT_PATH/transactions
+    mkdir $NOW
+    cd $NOW
     CUR_DIR=`pwd`
 
     # get protocol parameters
@@ -130,21 +142,63 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     echo "Source payment address UTXOs:"
     cat utxos.out
 
+    echo
+    echo "Source payment address UTXOs:"
+    cat utxos.out
+    rm -f assets.out
+    touch assets.out
+
     TX_IN=""
     TOTAL_BALANCE=0
+    TOTAL_ASSETS=""
     while read -r UTXO; do
         UTXO_HASH=$(awk '{ print $1 }' <<< "${UTXO}")
         UTXO_TXIX=$(awk '{ print $2 }' <<< "${UTXO}")
         UTXO_BALANCE=$(awk '{ print $3 }' <<< "${UTXO}")
+        UTXO_ASSETS=$(awk -F'lovelace' '{print $2}' <<< "${UTXO}")
+        if [[ ! $UTXO_ASSETS == " + TxOutDatumNone" ]]; then
+            # UTXO_ASSETS="toto"
+            SPLITTED="$(sed "s/ + /\n/g" <<< "$UTXO_ASSETS")"
+            readarray -t ARRAY <<< "$SPLITTED"
+
+            if [[ ${#ARRAY[@]} -gt 2 ]]; then
+                for a in "${ARRAY[@]}"; do
+                    if [[ ! $a == "" && ! $a == "TxOutDatumNone" ]]; then
+                        # echo "> '$a'"
+                        ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$a")
+                        ASSET_POLICY=$(awk '{ print $2 }' <<< "$a")
+                        echo "{\"amount\": $ASSET_AMOUNT, \"policy\": \"$ASSET_POLICY\"}" >> assets.out
+                    fi
+                done
+            fi
+        else
+            UTXO_ASSETS=""
+        fi
         TOTAL_BALANCE=$((${TOTAL_BALANCE}+${UTXO_BALANCE}))
+        echo
         echo "TxIn: ${UTXO_HASH}#${UTXO_TXIX}"
         echo "Lovelace: ${UTXO_BALANCE}"
+        echo "Assets: ${UTXO_ASSETS}"
         TX_IN="${TX_IN} --tx-in ${UTXO_HASH}#${UTXO_TXIX}"
     done < utxos.out
     TXCNT=$(cat utxos.out | wc -l)
+    echo
     echo "Total lovelace balance: $TOTAL_BALANCE"
     echo "UTXO count: $TXCNT"
     echo "TX_IN: $TX_IN"
+
+    cat assets.out | jq -s 'group_by(.policy) | map({policy: .[0].policy, amount: map(.amount) | add})' | jq -r '.[] | "\(.amount)\t\(.policy)"' > assets2.out
+    while read -r ASSET; do
+        ASSET_AMOUNT=$(awk '{ print $1 }' <<< "$ASSET")
+        ASSET_POLICY=$(awk '{ print $2 }' <<< "$ASSET")
+        if [[ ! $TOTAL_ASSETS == "" ]]; then
+            TOTAL_ASSETS="${TOTAL_ASSETS} + "
+        fi
+        TOTAL_ASSETS="${TOTAL_ASSETS}${ASSET_AMOUNT} ${ASSET_POLICY}"
+    done < assets2.out
+    echo
+    echo "TOTAL_ASSETS: ${TOTAL_ASSETS}"
+
 
     if [[ $TX_IN == "" ]]; then
         echo "ERROR: Cannot create transaction, Empty UTXO in SOURCE_PAYMENT_ADDR: $SOURCE_PAYMENT_ADDR"
@@ -219,6 +273,10 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     --testnet-magic $MAGIC \
     --protocol-params-file protocol.json | awk '{print $1}')
 
+    echo "TOTAL_BALANCE: ${TOTAL_BALANCE}"
+    echo "LOVELACE_AMOUNT: ${LOVELACE_AMOUNT}"
+    echo "FEE: ${FEE}"
+
     UTXO_LOVELACE_BALANCE_FINAL=$(expr $TOTAL_BALANCE - $LOVELACE_AMOUNT - $FEE)
 
     if [[ $UTXO_LOVELACE_BALANCE_FINAL -lt 0 ]];
@@ -272,7 +330,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR="transactions/$now"
+        STATE_TRANS_WORK_DIR="transactions/$NOW"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
@@ -284,25 +342,36 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
         echo $STATE_APPLY_SCRIPT
 
         echo "#!/bin/bash
-mkdir -p \$HOME/transactions/$now
-mv tx.raw \$HOME/transactions/$now
+mkdir -p \$HOME/transactions/$NOW
+mv tx.raw \$HOME/transactions/$NOW
 echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
     elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]; then
         echo "Creating a stake pool registration transaction"
 
-        cardano-cli transaction build-raw \
-        $TX_IN \
-        --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
-        --ttl $TTL \
-        --fee $FEE \
-        --out-file tx.raw \
-        --certificate-file $POOL_CERT_FILE \
-        --certificate-file $DELEGATION_CERT_FILE
+        if [[ $TOTAL_ASSETS == "" ]]; then
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw \
+            --certificate-file $POOL_CERT_FILE \
+            --certificate-file $DELEGATION_CERT_FILE
+        else
+            cardano-cli transaction build-raw \
+            $TX_IN \
+            --tx-out $DEST_PAYMENT_ADDR+$UTXO_LOVELACE_BALANCE_FINAL+"$TOTAL_ASSETS" \
+            --ttl $TTL \
+            --fee $FEE \
+            --out-file tx.raw \
+            --certificate-file $POOL_CERT_FILE \
+            --certificate-file $DELEGATION_CERT_FILE
+        fi
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR="transactions/$now"
+        STATE_TRANS_WORK_DIR="transactions/$NOW"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
@@ -314,8 +383,8 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
         echo $STATE_APPLY_SCRIPT
 
         echo "#!/bin/bash
-mkdir -p \$HOME/transactions/$now
-mv tx.raw \$HOME/transactions/$now
+mkdir -p \$HOME/transactions/$NOW
+mv tx.raw \$HOME/transactions/$NOW
 echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
     fi
 fi

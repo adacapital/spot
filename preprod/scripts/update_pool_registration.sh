@@ -4,20 +4,23 @@
 
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
-TOPO_FILE=~/pool_topology
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=$ROOT_PATH/pool_topology
+
 
 echo "UPDATE POOL REGISTRATION STARTING..."
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
 echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -42,6 +45,12 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
+
 
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
