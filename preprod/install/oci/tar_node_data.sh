@@ -3,6 +3,9 @@
 # ./spot/preprod/install/oci/tar_node_data.sh -node_type node.bp -root_path /home/cardano
 # scp file
 # tar -xzvf /target/node_archive.tar.gz -C /target
+#
+# use --strip-component=2 to fit the target path, e.g. will remove /home/cardano and from the current directory will extract to /node.bp/key
+# tar -xzvf preprod_relay1_node_archive.tar.gz --strip-components=2 
 
 # Initialize variables
 node_type=""
