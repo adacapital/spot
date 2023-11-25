@@ -3,19 +3,19 @@
 # Failure to do so will prevent the script from running.
 
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
 
 POOL_ID_HEX="8aa469088eaf5c38c3d4faf0d3516ca670cd6df5545fafea2f70258b"
 POOL_ID_BECH32="pool132jxjzyw4awr3s75ltcdx5tv5ecv6m042306l630wqjckhfm32r"
 
 # importing utility functions
 source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -40,6 +40,12 @@ else
     echo "ERROR: $ERROR"
     exit 1
 fi
+
+
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
 
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
@@ -70,7 +76,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
     STAKE_DIST_FRACTION_PCT=$(echo $STAKE_DIST_FRACTION_DEC*100 | bc )
 
 # build the pool info json file
-$(cat <<-END > $HOME/node.bp/pool_info.tmp.json
+$(cat <<-END > $ROOT_PATH/node.bp/pool_info.tmp.json
 {
     "pool_id_bech32": "${POOL_ID_BECH32}", 
     "pool_id_hex": "${POOL_ID_HEX}", 
@@ -82,10 +88,10 @@ END
 )
 
 # # format json file
-cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
-rm -f $HOME/node.bp/pool_info.tmp.json
+cat $ROOT_PATH/node.bp/pool_info.tmp.json | jq . > $ROOT_PATH/node.bp/pool_info.json
+rm -f $ROOT_PATH/node.bp/pool_info.tmp.json
 
 # # display pool info json file
-echo "$HOME/node.bp/pool_info.json"
-cat $HOME/node.bp/pool_info.json
+echo "$ROOT_PATH/node.bp/pool_info.json"
+cat $ROOT_PATH/node.bp/pool_info.json
 fi
