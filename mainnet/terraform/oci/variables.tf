@@ -62,7 +62,7 @@ variable "subnet_id_relay2_node" {
 
 variable "instance_prefix" {
   description = "Name prefix for vm instances"
-  default     = "preprod"
+  default     = "mainnet"
 }
 
 variable "image_id" {
@@ -82,21 +82,21 @@ variable "vm_shape" {
 
 variable "ocpus" {
   description = "The number of OCPUs for the VMs"
-  default     = 2
+  default     = 4
 }
 
 variable "memory_in_gbs" {
   description = "The amount of memory in GBs for the VMs"
-  default     = 12
+  default     = 16
 }
 
 variable "block_volume_size_in_gbs" {
   description = "The size of the block volume in GBs"
   type        = map(number)
   default     = {
-    "block_producing_node_vm" = 50
-    "relay_node_vm_1"         = 100
-    "relay_node_vm_2"         = 50
+    "block_producing_node_vm" = 256
+    "relay_node_vm_1"         = 256
+    "relay_node_vm_2"         = 256
   }
 }
 

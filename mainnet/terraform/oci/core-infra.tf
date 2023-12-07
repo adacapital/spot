@@ -8,18 +8,18 @@ data "template_file" "init_bp" {
   template = file("cloud-init-bp.yaml.tpl")
 
   vars = {
-    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-bp.pub"))
-    relay1_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay1.pub"))
-    relay2_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay2.pub"))
-    relay1_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay1")))
-    relay2_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay2")))
+    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-bp.pub"))
+    relay1_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay1.pub"))
+    relay2_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay2.pub"))
+    relay1_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay1")))
+    relay2_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay2")))
     bashrc_file = indent(7, file(".bashrc.tpl"))
   }
 }
 
 # Block Producing Node VM
 resource "oci_core_instance" "block_producing_node_vm" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   display_name        = "BP Node"
   shape               = var.vm_shape
@@ -30,7 +30,7 @@ resource "oci_core_instance" "block_producing_node_vm" {
   }
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.adact_preprod_bp_subnet.id
+    subnet_id        = oci_core_subnet.adact_mainnet_bp_subnet.id
     display_name     = "bp_node_vnic"
     assign_public_ip = var.public_ip["block_producing_node_vm"]
     hostname_label   = format("${var.instance_prefix}-bp")
@@ -43,14 +43,14 @@ resource "oci_core_instance" "block_producing_node_vm" {
   }
 
   metadata = {
-    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-preprod-bp.pub")
+    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-mainnet-bp.pub")
     user_data           = base64encode(data.template_file.init_bp.rendered)
   }
 }
 
 # Block Volume for Producing Node
 resource "oci_core_volume" "block_producing_node_volume" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   display_name        = "Block Producing Node Volume"
   size_in_gbs         = var.block_volume_size_in_gbs["block_producing_node_vm"]
@@ -66,9 +66,9 @@ resource "oci_core_volume_attachment" "block_producing_node_volume_attachment" {
 
 # Networking Security Group for Bastion Access
 resource "oci_core_network_security_group" "nsg_bp_node" {
-  compartment_id = oci_identity_compartment.adact_preprod.id
-#   vcn_id         = var.adact_preprod_ampere_vcn.id
-  vcn_id         = oci_core_vcn.adact_preprod_vcn.id
+  compartment_id = oci_identity_compartment.adact_mainnet.id
+#   vcn_id         = var.adact_mainnet_ampere_vcn.id
+  vcn_id         = oci_core_vcn.adact_mainnet_vcn.id
   display_name   = "NSG BP Node"
 }
 
@@ -130,16 +130,16 @@ data "template_file" "init_relay1" {
   template = file("cloud-init-relay.yaml.tpl")
 
   vars = {
-    relay_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay1.pub"))
-    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-bp.pub"))
-    bp_node_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-preprod-bp")))
+    relay_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay1.pub"))
+    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-bp.pub"))
+    bp_node_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-mainnet-bp")))
     bashrc_file = indent(7, file(".bashrc.tpl"))
   }
 }
 
 # Relay Node VM #1
 resource "oci_core_instance" "relay_node_vm_1" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   shape               = var.vm_shape
   shape_config {
@@ -149,7 +149,7 @@ resource "oci_core_instance" "relay_node_vm_1" {
   display_name        = "Relay Node VM #1"
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.adact_preprod_relay1_subnet.id
+    subnet_id        = oci_core_subnet.adact_mainnet_relay1_subnet.id
     display_name     = "vnic_relay1_node"
     assign_public_ip = var.public_ip["relay_node_vm_1"]
     hostname_label   = format("${var.instance_prefix}-relay1")
@@ -160,14 +160,14 @@ resource "oci_core_instance" "relay_node_vm_1" {
     source_id    = var.image_id
   }
   metadata = {
-    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-preprod-relay1.pub")
+    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-mainnet-relay1.pub")
     user_data           = base64encode(data.template_file.init_relay1.rendered)
   }
 }
 
 # Block Volume for Relay Node VM #1
 resource "oci_core_volume" "relay_node_vm_1_volume" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   display_name        = "Relay Node VM #1 Volume"
   size_in_gbs         = var.block_volume_size_in_gbs["relay_node_vm_1"]
@@ -183,8 +183,8 @@ resource "oci_core_volume_attachment" "relay_node_vm_1_volume_attachment" {
 
 # Networking Security Group for Bastion Access
 resource "oci_core_network_security_group" "nsg_relay1_node" {
-  compartment_id = oci_identity_compartment.adact_preprod.id
-  vcn_id         = oci_core_vcn.adact_preprod_vcn.id
+  compartment_id = oci_identity_compartment.adact_mainnet.id
+  vcn_id         = oci_core_vcn.adact_mainnet_vcn.id
   display_name   = "NSG Relay1 Node"
 }
 
@@ -241,16 +241,16 @@ data "template_file" "init_relay2" {
   template = file("cloud-init-relay.yaml.tpl")
 
   vars = {
-    relay_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-relay2.pub"))
-    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-preprod-bp.pub"))
-    bp_node_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-preprod-bp")))
+    relay_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-relay2.pub"))
+    bp_node_ssh_public_key = trimspace(file("/home/thomas/.oci/pem-adact-mainnet-bp.pub"))
+    bp_node_ssh_private_key = indent(6, trimspace(file("/home/thomas/.oci/pem-adact-mainnet-bp")))
     bashrc_file = indent(7, file(".bashrc.tpl"))
   }
 }
 
 # Relay Node VM #2
 resource "oci_core_instance" "relay_node_vm_2" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   shape               = var.vm_shape
   shape_config {
@@ -260,7 +260,7 @@ resource "oci_core_instance" "relay_node_vm_2" {
   display_name        = "Relay Node VM #2"
 
   create_vnic_details {
-    subnet_id        = oci_core_subnet.adact_preprod_relay2_subnet.id
+    subnet_id        = oci_core_subnet.adact_mainnet_relay2_subnet.id
     display_name     = "vnic_relay2_node"
     assign_public_ip = var.public_ip["relay_node_vm_2"]
     hostname_label   = format("${var.instance_prefix}-relay2")
@@ -271,14 +271,14 @@ resource "oci_core_instance" "relay_node_vm_2" {
     source_id    = var.image_id
   }
   metadata = {
-    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-preprod-relay2.pub")
+    ssh_authorized_keys = file("/home/thomas/.oci/pem-adact-mainnet-relay2.pub")
     user_data           = base64encode(data.template_file.init_relay2.rendered)
   }
 }
 
 # Block Volume for Relay Node VM #2
 resource "oci_core_volume" "relay_node_vm_2_volume" {
-  compartment_id      = oci_identity_compartment.adact_preprod.id
+  compartment_id      = oci_identity_compartment.adact_mainnet.id
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains.1.name
   display_name        = "Relay Node VM #2 Volume"
   size_in_gbs         = var.block_volume_size_in_gbs["relay_node_vm_2"]
@@ -294,8 +294,8 @@ resource "oci_core_volume_attachment" "relay_node_vm_2_volume_attachment" {
 
 # Networking Security Group for Bastion Access
 resource "oci_core_network_security_group" "nsg_relay2_node" {
-  compartment_id = oci_identity_compartment.adact_preprod.id
-  vcn_id         = oci_core_vcn.adact_preprod_vcn.id
+  compartment_id = oci_identity_compartment.adact_mainnet.id
+  vcn_id         = oci_core_vcn.adact_mainnet_vcn.id
   display_name   = "NSG Relay2 Node"
 }
 

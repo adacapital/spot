@@ -13,13 +13,13 @@ runcmd:
   - systemctl restart sshd
 
 write_files:
-  - path: /home/cardano/.ssh/adact-preprod-relay1
+  - path: /home/cardano/.ssh/adact-mainnet-relay1
     content: |
       ${relay1_ssh_private_key}
     owner: cardano:cardano
     permissions: '0600'
     defer: true
-  - path: /home/cardano/.ssh/adact-preprod-relay2
+  - path: /home/cardano/.ssh/adact-mainnet-relay2
     content: |
       ${relay2_ssh_private_key}
     owner: cardano:cardano

@@ -12,7 +12,7 @@ runcmd:
   - systemctl restart sshd
 
 write_files:
-  - path: /home/cardano/.ssh/adact-preprod-bp
+  - path: /home/cardano/.ssh/adact-mainnet-bp
     content: |
       ${bp_node_ssh_private_key}
     owner: cardano:cardano
