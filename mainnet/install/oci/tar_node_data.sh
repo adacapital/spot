@@ -32,7 +32,6 @@ fi
 if [ "$delta" = true ]; then
     # Create the tar file in delta mode
     tar -czvf "$root_path/node_archive_delta.tar.gz" \
-        "$root_path/$node_type/cncli/" \
         "$root_path/$node_type/config/" \
         "$root_path/$node_type/socket/" \
         "$root_path/$node_type/"*.*
