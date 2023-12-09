@@ -6,6 +6,9 @@
 #
 # use --strip-component=2 to fit the target path, e.g. will remove /home/cardano and from the current directory will extract to /node.bp/key
 # tar -xzvf preprod_relay1_node_archive.tar.gz --strip-components=2 
+#
+# or for bp node setup from a node.relay tar to extract just /db
+# tar -xzvf mainnet_relay1_node_db_archive.tar.gz --strip-components=3 -C /home/cardano/data/node.bp home/cardano/node.relay/db
 
 # Initialize variables
 node_type=""
