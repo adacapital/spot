@@ -49,9 +49,6 @@ fi
 
 NODE_PATH="${ROOT_PATH}/node.${NODE_TYPE}"
 # echo "NODE_PATH: $NODE_PATH"
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
-
 
 
 # relay node setup process
