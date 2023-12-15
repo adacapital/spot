@@ -10,8 +10,16 @@ fi
 NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -40,11 +48,14 @@ else
     exit 1
 fi
 
+NODE_PATH="$ROOT_PATH/node.bp"
+echo "NODE_PATH: $NODE_PATH"
+
 if [[ $NODE_TYPE == "bp" ]]; then
     CNCLI_STATUS=$($NS_PATH/cncli_status.sh | jq -r .status)
     EPOCH="${1:-next}"
     TIMEZONE="${2:-UTC}"
-    POOL_ID=$(cat $HOME/node.bp/pool_info.json | jq -r .pool_id_hex)
+    POOL_ID=$(cat $ROOT_PATH/node.bp/pool_info.json | jq -r .pool_id_hex)
     echo "EPOCH: $EPOCH"
     echo "TIMEZONE: $TIMEZONE"
     echo "POOL_ID: $POOL_ID"
@@ -52,11 +63,11 @@ if [[ $NODE_TYPE == "bp" ]]; then
     function getLeader() {
         # echo "getLeader, pool-stake $1, active-stake $2"
         /usr/local/bin/cncli leaderlog \
-            --db $HOME/node.bp/cncli/cncli.db \
+            --db $ROOT_PATH/node.bp/cncli/cncli.db \
             --pool-id  $POOL_ID \
-            --pool-vrf-skey $HOME/pool_keys/vrf.skey \
-            --byron-genesis $HOME/node.bp/config/bgenesis.json \
-            --shelley-genesis $HOME/node.bp/config/sgenesis.json \
+            --pool-vrf-skey $ROOT_PATH/pool_keys/vrf.skey \
+            --byron-genesis $ROOT_PATH/node.bp/config/bgenesis.json \
+            --shelley-genesis $ROOT_PATH/node.bp/config/sgenesis.json \
             --pool-stake $1 \
             --active-stake $2 \
             --ledger-set $EPOCH \
@@ -90,10 +101,10 @@ if [[ $NODE_TYPE == "bp" ]]; then
         echo "POOL_STAKE: $(echo $POOL_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
         echo "ACTIVE_STAKE: $(echo $ACTIVE_STAKE | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta')"
 
-        mv $HOME/node.bp/cncli/leaderlog.json $HOME/node.bp/cncli/leaderlog.$NOW.json
-        getLeader "$POOL_STAKE" "$ACTIVE_STAKE" > $HOME/node.bp/cncli/leaderlog.json
+        mv $ROOT_PATH/node.bp/cncli/leaderlog.json $ROOT_PATH/node.bp/cncli/leaderlog.$NOW.json
+        getLeader "$POOL_STAKE" "$ACTIVE_STAKE" > $ROOT_PATH/node.bp/cncli/leaderlog.json
 
-        LOG=$HOME/node.bp/cncli/leaderlog.json
+        LOG=$ROOT_PATH/node.bp/cncli/leaderlog.json
 
         EPOCH_=$(cat $LOG | jq .epoch)
         echo "\`Epoch $EPOCH_\` 🧙🔮:"
@@ -106,7 +117,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
         echo "leaderlog produced: $LOG"
 
         # remove leaderlogs older than 15 days
-        find $HOME/node.bp/cncli/. -name "leaderlog.*.json" -mtime +15 -exec rm -f '{}' \;
+        find $ROOT_PATH/node.bp/cncli/. -name "leaderlog.*.json" -mtime +15 -exec rm -f '{}' \;
     else
         echo "CNCLI database not synced!!!"
     fi

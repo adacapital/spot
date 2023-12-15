@@ -50,12 +50,11 @@ else
 fi
 
 NODE_PATH="${ROOT_PATH}/node.${NODE_TYPE}"
-MAGIC=$(get_network_magic)
 LATEST_TAG=$(curl -s https://api.github.com/repos/cardano-community/cncli/releases/latest | jq -r .tag_name)
-echo "NETWORK_MAGIC: $MAGIC"
 echo "NODE_PATH: $NODE_PATH"
 echo "LATEST_TAG: $LATEST_TAG"
 echo "SHELLEY_GENESIS_HASH: $SHELLEY_GENESIS_HASH"
+echo "BP_IP: $BP_IP"
 
 if ! promptyn "Please confirm you want to proceed? (y/n)"; then
     echo "Ok bye!"
@@ -63,41 +62,41 @@ if ! promptyn "Please confirm you want to proceed? (y/n)"; then
 fi
 
 if [[ $NODE_TYPE == "bp" ]]; then
-    echo
-    echo '---------------- Building CNCLI binary from source ----------------'
-    echo '--------- Prepare RUST environment -------'
-    mkdir -p $HOME/.cargo/bin
-    chown -R $USER\: $HOME/.cargo
-    touch $HOME/.profile
-    chown $USER\: $HOME/.profile
+    # echo
+    # echo '---------------- Building CNCLI binary from source ----------------'
+    # echo '--------- Prepare RUST environment -------'
+    # mkdir -p $HOME/.cargo/bin
+    # chown -R $USER\: $HOME/.cargo
+    # touch $HOME/.profile
+    # chown $USER\: $HOME/.profile
 
-    echo '--------- Install rustup - proceed with default install (option 1) -------'
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-    source $HOME/.cargo/env
-    rustup install stable
-    rustup default stable
-    rustup update
-    rustup component add clippy rustfmt
-    # rustup target add x86_64-unknown-linux-musl
-    rustup target add aarch64-unknown-linux-gnu
+    # echo '--------- Install rustup - proceed with default install (option 1) -------'
+    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    # source $HOME/.cargo/env
+    # rustup install stable
+    # rustup default stable
+    # rustup update
+    # rustup component add clippy rustfmt
+    # # rustup target add x86_64-unknown-linux-musl
+    # rustup target add aarch64-unknown-linux-gnu
 
-    echo '--------- Install dependencies and build cncli -------'
-    source $HOME/.cargo/env
-    sudo apt-get update -y && sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf musl-tools
-    cd ~/data/download
-    git clone --recurse-submodules https://github.com/cardano-community/cncli
-    cd cncli
-    git checkout $LATEST_TAG
-    # cargo install --path . --force
-    cargo install --path . --force --target aarch64-unknown-linux-gnu
-    cncli --version
-    command -v cncli
-    sudo cp /home/cardano/.cargo/bin/cncli /usr/local/bin
+    # echo '--------- Install dependencies and build cncli -------'
+    # source $HOME/.cargo/env
+    # sudo apt-get update -y && sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf musl-tools
+    # cd ~/data/download
+    # git clone --recurse-submodules https://github.com/cardano-community/cncli
+    # cd cncli
+    # git checkout $LATEST_TAG
+    # # cargo install --path . --force
+    # cargo install --path . --force --target aarch64-unknown-linux-gnu
+    # cncli --version
+    # command -v cncli
+    # sudo cp /home/cardano/.cargo/bin/cncli /usr/local/bin
 
-      if ! promptyn "Please confirm you want to proceed? (y/n)"; then
-        echo "Ok bye!"
-        exit 1
-    fi
+    #   if ! promptyn "Please confirm you want to proceed? (y/n)"; then
+    #     echo "Ok bye!"
+    #     exit 1
+    # fi
 
     echo "Setting up CNCLI SYNC as a service"
     BLOCKPRODUCING_IP=$BP_IP
@@ -116,7 +115,7 @@ Type=simple
 Restart=always
 RestartSec=5
 LimitNOFILE=131072
-ExecStart=/home/cardano/.cargo/bin/cncli sync --network-magic $MAGIC --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $ROOT_PATH/node.bp/cncli/cncli.db --shelley-genesis-hash $SHELLEY_GENESIS_HASH
+ExecStart=/home/cardano/.local/bin/cncli sync --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $ROOT_PATH/node.bp/cncli/cncli.db --shelley-genesis-hash $SHELLEY_GENESIS_HASH
 KillSignal=SIGINT
 SuccessExitStatus=143
 StandardOutput=syslog

@@ -3,11 +3,13 @@
 # Failure to do so will prevent the script from running.
 
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
 
 POOL_ID_HEX="22ab39540db22349b1934f5dcb7788440c33709ea9fdac07fb343395"
 POOL_ID_BECH32="pool1y24nj4qdkg35nvvnfawukauggsxrxuy74876cplmxsee29w5axc"
@@ -39,6 +41,9 @@ else
     exit 1
 fi
 
+NODE_PATH="$ROOT_PATH/node.bp"
+echo "NODE_PATH: $NODE_PATH"
+
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
     # checking we're in an air-gapped environment
@@ -68,7 +73,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 ]]; then
     STAKE_DIST_FRACTION_PCT=$(echo $STAKE_DIST_FRACTION_DEC*100 | bc )
 
 # build the pool info json file
-$(cat <<-END > $HOME/node.bp/pool_info.tmp.json
+$(cat <<-END > $ROOT_PATH/node.bp/pool_info.tmp.json
 {
     "pool_id_bech32": "${POOL_ID_BECH32}", 
     "pool_id_hex": "${POOL_ID_HEX}", 
@@ -80,12 +85,12 @@ END
 )
 
 # # format json file
-cat $HOME/node.bp/pool_info.tmp.json | jq . > $HOME/node.bp/pool_info.json
-rm -f $HOME/node.bp/pool_info.tmp.json
+cat $ROOT_PATH/node.bp/pool_info.tmp.json | jq . > $ROOT_PATH/node.bp/pool_info.json
+rm -f $ROOT_PATH/node.bp/pool_info.tmp.json
 
 # # display pool info json file
-echo "$HOME/node.bp/pool_info.json"
-cat $HOME/node.bp/pool_info.json
+echo "$ROOT_PATH/node.bp/pool_info.json"
+cat $ROOT_PATH/node.bp/pool_info.json
 
 # clean up
 rm -f /tmp/pool-params.json
