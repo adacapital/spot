@@ -121,8 +121,8 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     # create working directory for the transaction
     mkdir -p ~/transactions
     cd ~/transactions
-    mkdir $now
-    cd $now
+    mkdir $NOW
+    cd $NOW
     CUR_DIR=`pwd`
 
     # get protocol parameters
@@ -339,7 +339,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR="transactions/$now"
+        STATE_TRANS_WORK_DIR="transactions/$NOW"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
@@ -386,7 +386,7 @@ echo "state applied, please now run init_stake.sh"' > $STATE_APPLY_SCRIPT
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR="transactions/$now"
+        STATE_TRANS_WORK_DIR="transactions/$NOW"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
