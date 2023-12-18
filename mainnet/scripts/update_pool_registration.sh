@@ -4,15 +4,19 @@
 
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
-TOPO_FILE=~/pool_topology
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=$ROOT_PATH/pool_topology
 
 echo "UPDATE POOL REGISTRATION STARTING..."
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
 echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -41,6 +45,9 @@ else
     exit 1
 fi
 
+NODE_PATH="$ROOT_PATH/node.bp"
+echo "NODE_PATH: $NODE_PATH"
+
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
     # checking we're in an air-gapped environment
@@ -60,7 +67,7 @@ if [[ $NODE_TYPE == "airgap" ]]; then
 fi
 
 # getting the script state ready
-STATE_FILE="$HOME/spot.state"
+STATE_FILE="$ROOT_PATH/spot.state"
 
 if [ -f "$STATE_FILE" ]; then
     # Source the state file to restore state
@@ -97,7 +104,7 @@ fi
 
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR $META_URL $META_DATA_HASH $MIN_POOL_COST
 
-cd $HOME/pool_keys
+cd $ROOT_PATH/pool_keys
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "init" ]]; then
     echo
@@ -137,13 +144,13 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     echo "META_DATA_HASH: $META_DATA_HASH"
 
     # getting useful information for next step
-    MIN_POOL_COST=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
+    MIN_POOL_COST=$(cat $ROOT_PATH/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
     STATE_SUB_STEP_ID="certificates"
     STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
     save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR META_URL META_DATA_HASH MIN_POOL_COST
 
     # copy certain files back to the air-gapped environment to continue operation there
-    STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+    STATE_APPLY_SCRIPT=$ROOT_PATH/apply_state.sh
     echo
     echo "Please move the following files back to your air-gapped environment in your home directory and run update_pool_registration.sh."
     echo $STATE_FILE
@@ -181,13 +188,13 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     fi
 
     cardano-cli stake-pool registration-certificate \
-    --cold-verification-key-file $HOME/cold_keys/cold.vkey \
-    --vrf-verification-key-file $HOME/pool_keys/vrf.vkey \
+    --cold-verification-key-file $ROOT_PATH/cold_keys/cold.vkey \
+    --vrf-verification-key-file $ROOT_PATH/pool_keys/vrf.vkey \
     --pool-pledge $POOL_PLEDGE \
     --pool-cost $POOL_COST \
     --pool-margin $POOL_MARGIN \
-    --pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
-    --pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
+    --pool-reward-account-verification-key-file $ROOT_PATH/keys/stake.vkey \
+    --pool-owner-stake-verification-key-file $ROOT_PATH/keys/stake.vkey \
     --mainnet \
     $RELAY_PARAMS \
     --metadata-url $META_URL \
@@ -198,8 +205,8 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $S
     echo '---------------- Create a delegation certificate ----------------'
 
     cardano-cli stake-address delegation-certificate \
-    --stake-verification-key-file $HOME/keys/stake.vkey \
-    --cold-verification-key-file $HOME/cold_keys/cold.vkey \
+    --stake-verification-key-file $ROOT_PATH/keys/stake.vkey \
+    --cold-verification-key-file $ROOT_PATH/cold_keys/cold.vkey \
     --out-file delegation.cert
 
     STATE_SUB_STEP_ID="build.trans"
@@ -220,15 +227,26 @@ fi" >> ~/.bashrc
 
     # copy certain files to usb key to continue operations on bp node
     cp $STATE_FILE $SPOT_USB_KEY
-    cp $HOME/pool_keys/pool-registration.cert $SPOT_USB_KEY
-    cp $HOME/pool_keys/delegation.cert $SPOT_USB_KEY
+    cp $ROOT_PATH/pool_keys/pool-registration.cert $SPOT_USB_KEY
+    cp $ROOT_PATH/pool_keys/delegation.cert $SPOT_USB_KEY
     STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
-    echo "#!/bin/bash
-mv pool-registration.cert \$HOME/pool_keys
-mv delegation.cert \$HOME/pool_keys
-chmod 400 \$HOME/pool_keys/pool-registration.cert
-chmod 400 \$HOME/pool_keys/delegation.cert
-echo \"state applied, please now run update_pool_registration.sh\"" > $STATE_APPLY_SCRIPT
+
+    echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mv pool-registration.cert $ROOT_PATH/pool_keys
+mv delegation.cert $HOME/pool_keys
+chmod 400 $HOME/pool_keys/pool-registration.cert
+chmod 400 $HOME/pool_keys/delegation.cert
+echo "state applied, please now run update_pool_registration.sh"' > $STATE_APPLY_SCRIPT
+
+
+#     echo "#!/bin/bash
+# ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+# mv pool-registration.cert \$ROOT_PATH/pool_keys
+# mv delegation.cert \$HOME/pool_keys
+# chmod 400 \$HOME/pool_keys/pool-registration.cert
+# chmod 400 \$HOME/pool_keys/delegation.cert
+# echo \"state applied, please now run update_pool_registration.sh\"" > $STATE_APPLY_SCRIPT
 
     echo
     echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh, then come back to this prompt..."
@@ -260,10 +278,10 @@ echo '---------------- Submit stake pool registration certificate and delegation
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "build.trans" ]]; then
     # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-    $NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) 0 NONE NONE NONE $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+    $NS_PATH/create_transaction.sh $(cat $ROOT_PATH/keys/paymentwithstake.addr) $(cat $ROOT_PATH/keys/paymentwithstake.addr) 0 NONE NONE NONE $ROOT_PATH/pool_keys/pool-registration.cert $ROOT_PATH/pool_keys/delegation.cert
 elif [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "sign.trans" ]]; then
     # signing a transaction to register our stake pool registration & delegation certificates onto the blockchain
-    $NS_PATH/create_transaction.sh NONE NONE NONE $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/cold_keys/cold.skey NONE NONE
+    $NS_PATH/create_transaction.sh NONE NONE NONE $ROOT_PATH/keys/payment.skey $ROOT_PATH/keys/stake.skey $ROOT_PATH/cold_keys/cold.skey NONE NONE
 elif [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE_SUB_STEP_ID == "submit.trans" ]]; then
     # submiting a transaction to register our stake pool registration & delegation certificates onto the blockchain
     $NS_PATH/create_transaction.sh NONE NONE NONE NONE NONE NONE

@@ -3,11 +3,20 @@
 # Signing a transaction need to happen in your air-gapped environement.
 
 # global variables
-now=`date +"%Y%m%d_%H%M%S"`
+NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
+
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
+
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -50,6 +59,9 @@ else
     exit 1
 fi
 
+NODE_PATH="$ROOT_PATH/node.bp"
+echo "NODE_PATH: $NODE_PATH"
+
 IS_AIR_GAPPED=0
 if [[ $NODE_TYPE == "airgap" ]]; then
     # checking we're in an air-gapped environment
@@ -69,7 +81,7 @@ if [[ $NODE_TYPE == "airgap" ]]; then
 fi
 
 # getting the script state ready
-STATE_FILE="$HOME/spot.state"
+STATE_FILE="$ROOT_PATH/spot.state"
 
 if [ -f "$STATE_FILE" ]; then
     # Source the state file to restore state
@@ -331,17 +343,23 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
-        STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+        STATE_APPLY_SCRIPT=$ROOT_PATH/apply_state.sh
         echo
         echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
         echo $STATE_FILE
         echo $CUR_DIR/tx.raw
         echo $STATE_APPLY_SCRIPT
 
-        echo "#!/bin/bash
-mkdir -p \$HOME/transactions/$now
-mv tx.raw \$HOME/transactions/$now
-echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
+        echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/transactions/'$NOW'
+mv tx.raw $ROOT_PATH/transactions/'$NOW'
+echo "state applied, please now run init_stake.sh"' > $STATE_APPLY_SCRIPT
+
+#         echo "#!/bin/bash
+# mkdir -p \$HOME/transactions/$NOW
+# mv tx.raw \$HOME/transactions/$NOW
+# echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
 
     elif [[ $TXOCNT -eq 1 && $POOL_CERT_FILE != "" && $DELEGATION_CERT_FILE != "" ]]; then
         echo "Creating a stake pool registration transaction"
@@ -372,17 +390,23 @@ echo \"state applied, please now run init_stake.sh\"" > $STATE_APPLY_SCRIPT
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
-        STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+        STATE_APPLY_SCRIPT=$ROOT_PATH/apply_state.sh
         echo
         echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
         echo $STATE_FILE
         echo $CUR_DIR/tx.raw
         echo $STATE_APPLY_SCRIPT
 
-        echo "#!/bin/bash
-mkdir -p \$HOME/transactions/$now
-mv tx.raw \$HOME/transactions/$now
-echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+        echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/transactions/'$NOW'
+mv tx.raw $ROOT_PATH/transactions/'$NOW'
+echo "state applied, please now run register_pool.sh"' > $STATE_APPLY_SCRIPT
+
+#         echo "#!/bin/bash
+# mkdir -p \$HOME/transactions/$NOW
+# mv tx.raw \$HOME/transactions/$NOW
+# echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
     elif [[ $TXOCNT -eq 1 && $VOTE_METADATA_JSON != "" ]]; then
         echo "Creating a stake pool vote transaction"
@@ -412,21 +436,27 @@ echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
         STATE_SUB_STEP_ID="sign.trans"
         STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-        STATE_TRANS_WORK_DIR="transactions/$now"
+        STATE_TRANS_WORK_DIR="transactions/$NOW"
         save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE STATE_TRANS_WORK_DIR
 
         # copy certain files back to the air-gapped environment to continue operation there
-        STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+        STATE_APPLY_SCRIPT=$ROOT_PATH/apply_state.sh
         echo
         echo "Please copy the following files back to your air-gapped environment home directory and run apply_state.sh."
         echo $STATE_FILE
         echo $CUR_DIR/tx.raw
         echo $STATE_APPLY_SCRIPT
 
-        echo "#!/bin/bash
-mkdir -p \$HOME/transactions/$now
-mv tx.raw \$HOME/transactions/$now
-echo \"state applied, please now run spo_poll_vote.sh\"" > $STATE_APPLY_SCRIPT
+        echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/transactions/'$NOW'
+mv tx.raw $ROOT_PATH/transactions/'$NOW'
+echo "state applied, please now run spo_poll_vote.sh"' > $STATE_APPLY_SCRIPT
+
+#         echo "#!/bin/bash
+# mkdir -p \$HOME/transactions/$NOW
+# mv tx.raw \$HOME/transactions/$NOW
+# echo \"state applied, please now run spo_poll_vote.sh\"" > $STATE_APPLY_SCRIPT
     fi
 
 fi
@@ -440,7 +470,7 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
     if [[ $VOTE_METADATA_JSON != "" ]]; then WITCNT=2; fi
     if [[ $DELEGATION_CERT_FILE != "" ]]; then WITCNT=3; fi
 
-    CUR_DIR=$HOME/$STATE_TRANS_WORK_DIR
+    CUR_DIR=$ROOT_PATH/$STATE_TRANS_WORK_DIR
     cd $CUR_DIR
 
     # sign the transaction
@@ -498,10 +528,17 @@ if [[ $STATE_SUB_STEP_ID == "sign.trans" && $NODE_TYPE == "airgap" && $IS_AIR_GA
         cp $STATE_FILE $SPOT_USB_KEY
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
         STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
-        echo "#!/bin/bash
-mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
-mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
-echo \"state applied, please now run $ACTION\"" > $STATE_APPLY_SCRIPT
+
+        echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/'$STATE_TRANS_WORK_DIR'
+mv tx.signed $ROOT_PATH/'$STATE_TRANS_WORK_DIR'
+echo "state applied, please now run '$ACTION'"' > $STATE_APPLY_SCRIPT
+
+#         echo "#!/bin/bash
+# mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
+# mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
+# echo \"state applied, please now run $ACTION\"" > $STATE_APPLY_SCRIPT
 
         echo
         echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
@@ -537,10 +574,17 @@ echo \"state applied, please now run $ACTION\"" > $STATE_APPLY_SCRIPT
         cp $STATE_FILE $SPOT_USB_KEY
         cp $CUR_DIR/tx.signed $SPOT_USB_KEY
         STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
-        echo "#!/bin/bash
-mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
-mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
-echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
+
+        echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/'$STATE_TRANS_WORK_DIR'
+mv tx.signed $ROOT_PATH/'$STATE_TRANS_WORK_DIR'
+echo "state applied, please now run register_pool.sh"' > $STATE_APPLY_SCRIPT
+
+#         echo "#!/bin/bash
+# mkdir -p \$HOME/$STATE_TRANS_WORK_DIR
+# mv tx.signed \$HOME/$STATE_TRANS_WORK_DIR
+# echo \"state applied, please now run register_pool.sh\"" > $STATE_APPLY_SCRIPT
 
         echo
         echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
@@ -551,7 +595,7 @@ if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
     echo
     echo '----------------Submitting the transaction... ----------------'
     
-    CUR_DIR=$HOME/$STATE_TRANS_WORK_DIR
+    CUR_DIR=$ROOT_PATH/$STATE_TRANS_WORK_DIR
     cd $CUR_DIR
 
     if ! promptyn "Please confirm you want to proceed with sending transaction $CUR_DIR? (y/n)"; then
