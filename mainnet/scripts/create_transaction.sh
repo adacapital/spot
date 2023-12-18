@@ -615,7 +615,7 @@ if [[ $STATE_SUB_STEP_ID == "submit.trans" && $IS_AIR_GAPPED == 0 ]]; then
         echo "Transaction sent!"
 
          #Show the TxID
-        TX_ID=$(cardanocli transaction txid --tx-file tx.signed); 
+        TX_ID=$(cardano-cli transaction txid --tx-file tx.signed); 
         echo -e "\e[0m TxID is: \e[32m${txID}\e[0m"
         echo $TX_ID > tx.id
 
