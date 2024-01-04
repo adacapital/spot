@@ -100,9 +100,9 @@ get_topo () {
 
 # spot topology utils
 get_network_magic () {
-    CONF=~/node.bp/config/bgenesis.json
+    CONF=$NODE_PATH/config/bgenesis.json
     if [ ! -f "$CONF" ]; then
-        CONF=~/node.relay/config/bgenesis.json
+        CONF=$NODE_PATH/config/bgenesis.json
         if [ ! -f "$CONF" ]; then
             echo "get_network_magic(): byron genesis file not found, bye for now!"
             exit

@@ -8,12 +8,14 @@ NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
 PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
-ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")/preview"
 NS_PATH="$SPOT_DIR/scripts"
 TOPO_FILE=$ROOT_PATH/pool_topology
 CLI_PATH=/home/cardano/.local/bin/
 # CLI_PATH=${HOME}/.local/bin/CIP-0094
 
+echo
+echo "CREATE TRANSACTION..."
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
 echo "ROOT_PATH: $ROOT_PATH"
@@ -21,8 +23,44 @@ echo "NS_PATH: $NS_PATH"
 echo "TOPO_FILE: $TOPO_FILE"
 echo "CLI_PATH: $CLI_PATH"
 
+# exit
+
 # importing utility functions
 source $NS_PATH/utils.sh
+
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
+
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
+
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
+else
+    echo "ERROR: $ERROR"
+    exit 1
+fi
+
+
+echo
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
+
+# exit
+
 
 if [[ $# -eq 5 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" && ! $5 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=""; LOVELACE_AMOUNT=0; SKEY_FILE=$2; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=$3; COLD_VKEY_FILE=$4; POOL_CERT_FILE=""; DELEGATION_CERT_FILE=""; VOTE_METADATA_JSON=$5;
 elif [[ $# -eq 4 && ! $1 == "" && ! $2 == "" && ! $3 == "" && ! $4 == "" ]]; then SOURCE_PAYMENT_ADDR=$1; DEST_PAYMENT_ADDR=$2; LOVELACE_AMOUNT=$3; SKEY_FILE=$4; SKEY_FILE_STAKE=""; STAKE_CERT_FILE=""; COLD_KEY_FILE=""; POOL_CERT_FILE=""; DELEGATION_CERT_FILE=""; VOTE_METADATA_JSON="";
@@ -53,12 +91,6 @@ if ! promptyn "Please confirm you want to proceed? (y/n)"; then
     exit 1
 fi
 
-echo
-NODE_PATH="$ROOT_PATH/node.bp"
-MAGIC=$(get_network_magic)
-echo "NODE_PATH: $NODE_PATH"
-echo "NETWORK_MAGIC: $MAGIC"
-
 # create working directory for the transaction
 mkdir -p $ROOT_PATH/transactions
 cd $ROOT_PATH/transactions
@@ -67,11 +99,13 @@ cd $NOW
 CUR_DIR=`pwd`
 
 # get protocol parameters
-${CLI_PATH}/cardano-cli query protocol-parameters --testnet-magic $MAGIC --out-file protocol.json
+# ${CLI_PATH}/cardano-cli query protocol-parameters --testnet-magic $MAGIC --out-file protocol.json
+${CLI_PATH}/cardano-cli query protocol-parameters --socket-path /home/cardano/data/preview/node.bp/socket/node.socket --testnet-magic $MAGIC --out-file protocol.json
 
 # determine the TTL (Time To Live) for the transaction
 # CTIP : the current tip of the blockchain
-CTIP=$(${CLI_PATH}/cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
+# CTIP=$(${CLI_PATH}/cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
+CTIP=$(${CLI_PATH}/cardano-cli query tip --socket-path /home/cardano/data/preview/node.bp/socket/node.socket --testnet-magic $MAGIC | jq -r .slot)
 TTL=$(expr $CTIP + 1200)
 
 echo "CTIP: $CTIP"
@@ -376,6 +410,7 @@ echo
 # submit the transaction
 ${CLI_PATH}/cardano-cli transaction submit \
 --tx-file tx.signed \
+--socket-path /home/cardano/data/preview/node.bp/socket/node.socket \
 --testnet-magic $MAGIC
 
 TXID=$(${CLI_PATH}/cardano-cli transaction txid --tx-file ./tx.signed)

@@ -4,22 +4,60 @@
 
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
-TOPO_FILE=~/pool_topology
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")/preview"
 NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=$ROOT_PATH/pool_topology
+
 
 echo "UPDATE POOL REGISTRATION STARTING..."
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
 echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
+
+# exit
 
 # importing utility functions
 source $NS_PATH/utils.sh
+
+echo
+echo '---------------- Reading pool topology file and preparing a few things... ----------------'
+
+read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
+RELAYS=($RELAYS)
+cnt=${#RELAYS[@]}
+let cnt1="$cnt/3"
+let cnt2="$cnt1 + $cnt1"
+let cnt3="$cnt2 + $cnt1"
+
+RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
+RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
+RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
+
+if [[ $ERROR == "none" ]]; then
+    echo "NODE_TYPE: $NODE_TYPE"
+    echo "RELAY_IPS: ${RELAY_IPS[@]}"
+    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
+    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
+else
+    echo "ERROR: $ERROR"
+    exit 1
+fi
+
+# NODE_PATH="${ROOT_PATH}/node.${NODE_TYPE}"
+NODE_PATH="${ROOT_PATH}/node.bp"
+# echo "NODE_PATH: $NODE_PATH"
 MAGIC=$(get_network_magic)
 echo "NETWORK_MAGIC: $MAGIC"
+echo "NODE_PATH: $NODE_PATH"
 
-cd $HOME/pool_keys
+# exit
+
+cd $ROOT_PATH/pool_keys
 
 echo
 echo '---------------- Create a JSON file with you testnet pool metadata ----------------'
@@ -51,7 +89,7 @@ echo
 echo '---------------- Create a stake pool registration certificate ----------------'
 
 POOL_PLEDGE=$(prompt_input_default POOL_PLEDGE 1000000000)
-MIN_POOL_COST=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
+MIN_POOL_COST=$(cat $ROOT_PATH/node.bp/config/sgenesis.json | jq -r '.protocolParams | .minPoolCost')
 POOL_COST=$(prompt_input_default POOL_COST $MIN_POOL_COST)
 POOL_MARGIN=$(prompt_input_default POOL_MARGIN 0.03)
 
@@ -73,11 +111,11 @@ cardano-cli stake-pool registration-certificate \
 --pool-pledge $POOL_PLEDGE \
 --pool-cost $POOL_COST \
 --pool-margin $POOL_MARGIN \
---pool-reward-account-verification-key-file $HOME/keys/stake.vkey \
---pool-owner-stake-verification-key-file $HOME/keys/stake.vkey \
+--pool-reward-account-verification-key-file $ROOT_PATH/keys/stake.vkey \
+--pool-owner-stake-verification-key-file $ROOT_PATH/keys/stake.vkey \
 --testnet-magic $MAGIC \
---pool-relay-ipv4 51.104.251.142 \
---pool-relay-port 3001 \
+--pool-relay-ipv4 132.145.71.219 \
+--pool-relay-port 6001 \
 --metadata-url $META_URL \
 --metadata-hash $META_DATA_HASH \
 --out-file pool-registration.cert
@@ -86,15 +124,15 @@ echo
 echo '---------------- Create a delegation certificate ----------------'
 
 cardano-cli stake-address delegation-certificate \
---stake-verification-key-file $HOME/keys/stake.vkey \
---cold-verification-key-file $HOME/pool_keys/cold.vkey \
+--stake-verification-key-file $ROOT_PATH/keys/stake.vkey \
+--cold-verification-key-file $ROOT_PATH/pool_keys/cold.vkey \
 --out-file delegation.cert
 
 echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
 # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-$NS_PATH/create_transaction.sh $(cat $HOME/keys/paymentwithstake.addr) $(cat $HOME/keys/paymentwithstake.addr) 0 $HOME/keys/payment.skey $HOME/keys/stake.skey $HOME/pool_keys/cold.skey $HOME/pool_keys/pool-registration.cert $HOME/pool_keys/delegation.cert
+$NS_PATH/create_transaction.sh $(cat $ROOT_PATH/keys/paymentwithstake.addr) $(cat $ROOT_PATH/keys/paymentwithstake.addr) 0 $ROOT_PATH/keys/payment.skey $ROOT_PATH/keys/stake.skey $ROOT_PATH/pool_keys/cold.skey $ROOT_PATH/pool_keys/pool-registration.cert $ROOT_PATH/pool_keys/delegation.cert
 
 # checking that our pool registration was successful
-$NS_PATH/pool_info.sh
+# $NS_PATH/pool_info.sh
