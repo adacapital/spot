@@ -2,16 +2,20 @@
 
 # global variables
 NOW=`date +"%Y%m%d_%H%M%S"`
-TOPO_FILE=~/pool_topology
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
+TOPO_FILE=$ROOT_PATH/pool_topology
 
-echo "INIT SCRIPT STARTING..."
+
+echo "UPDATE POOL REGISTRATION STARTING..."
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
 echo "NS_PATH: $NS_PATH"
-echo
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -48,47 +52,57 @@ else
     exit 1
 fi
 
+NODE_PATH="$ROOT_PATH/node.bp"
+MAGIC=$(get_network_magic)
+echo "NODE_PATH: $NODE_PATH"
+echo "NETWORK_MAGIC: $MAGIC"
+
 # starting binaries update script if we are on the bp node
 if [[ $NODE_TYPE == "bp" ]]; then
-    sudo unattended-upgrade -d
-    sudo apt-get update -y
-    sudo apt-get upgrade -y
+    # sudo unattended-upgrade -d
+    # sudo apt-get update -y
+    # sudo apt-get upgrade -y
 
-    cardano-cli --version
+    # cardano-cli --version
 
-    echo
-    echo '---------------- Updating the node from source ---------------- '
+    # echo
+    # echo '---------------- Updating the node from source ---------------- '
     
-    CARDANO_NODE_CLONE_DIR=~/download/cardano-node
-    if [ ! -d "$CARDANO_NODE_CLONE_DIR" ]; then
-        echo "Cloning cardano-node source."
-        cd ~/download
-        git clone https://github.com/input-output-hk/cardano-node.git
-        cd ~/download/cardano-node
-    else
-        echo "Updating cardano-node source."
-        cd ~/download/cardano-node
-        git fetch --all --recurse-submodules --tags
-    fi
+    # CARDANO_NODE_CLONE_DIR=$ROOT_PATH/cardano-node
+    # if [ ! -d "$CARDANO_NODE_CLONE_DIR" ]; then
+    #     echo "Cloning cardano-node source."
+    #     cd $ROOT_PATH
+    #     git clone https://github.com/IntersectMBO/cardano-node.git 
+    #     cd $ROOT_PATH/cardano-node
+    # else
+    #     echo "Updating cardano-node source."
+    #     cd $ROOT_PATH/cardano-node
+    #     git fetch --all --recurse-submodules --tags
+    # fi
 
-    # git fetch --all --tags
-    # git checkout "tags/$1"
-    # git checkout p2p-master-1.31.0
-    # git checkout karknu/blockfetch_order
-    git checkout "$1"
 
-    echo
-    git describe --tags
+    # git fetch --all --recurse-submodules --tags
+    # git tag | sort -V
+    # git checkout tags/$1
+    
 
-    echo
-    if ! promptyn "Is this the correct tag? (y/n)"; then
-        echo "Ok bye!"
-        exit 1
-    fi
+    # echo
+    # git describe --tags
 
-    cabal clean
-    cabal update
-    cabal build all
+    # echo
+    # if ! promptyn "Is this the correct tag? (y/n)"; then
+    #     echo "Ok bye!"
+    #     exit 1
+    # fi
+
+    # # echo "with-compiler: ghc-8.10.7" >> cabal.project.local
+    # echo "with-compiler: ghc-9.6.3" >> cabal.project.local
+
+    # cabal clean
+    # cabal update
+    # # cabal build all
+    # cabal build cardano-node
+    # cabal build cardano-cli
 
     echo
     if ! promptyn "Build complete, ready to stop/restart services? (y/n)"; then
@@ -101,9 +115,10 @@ if [[ $NODE_TYPE == "bp" ]]; then
     sudo systemctl stop cncli_sync
     sudo systemctl stop run.bp
 
-    cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-cli)" ~/.local/bin/
-    cp -p "$($SPOT_PATH/scripts/bin_path.sh cardano-node)" ~/.local/bin/
+    cp -p "$($NS_PATH/bin_path.sh cardano-cli $ROOT_PATH/cardano-node)" ~/.local/bin/
+    cp -p "$($NS_PATH/bin_path.sh cardano-node $ROOT_PATH/cardano-node)" ~/.local/bin/
     cardano-cli --version
+    cardano-node --version
 
     echo
     echo '---------------- Starting node services ---------------- '
@@ -126,7 +141,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
     for (( i=0; i<${RELAYS_COUNT}; i++ ));
     do
         echo "Checking ${RELAY_IPS[$i]} is online..."
-        ping -c1 -W1 -q ${RELAY_IPS[$i]} &>/dev/null
+        nc -zvw3 ${RELAY_IPS[$i]} 22 &>/dev/null
         status=$( echo $? )
         if [[ $status == 0 ]] ; then
             echo "Online"
