@@ -59,50 +59,50 @@ echo "NETWORK_MAGIC: $MAGIC"
 
 # starting binaries update script if we are on the bp node
 if [[ $NODE_TYPE == "bp" ]]; then
-    # sudo unattended-upgrade -d
-    # sudo apt-get update -y
-    # sudo apt-get upgrade -y
+    sudo unattended-upgrade -d
+    sudo apt-get update -y
+    sudo apt-get upgrade -y
 
-    # cardano-cli --version
+    cardano-cli --version
 
-    # echo
-    # echo '---------------- Updating the node from source ---------------- '
+    echo
+    echo '---------------- Updating the node from source ---------------- '
     
-    # CARDANO_NODE_CLONE_DIR=$ROOT_PATH/cardano-node
-    # if [ ! -d "$CARDANO_NODE_CLONE_DIR" ]; then
-    #     echo "Cloning cardano-node source."
-    #     cd $ROOT_PATH
-    #     git clone https://github.com/IntersectMBO/cardano-node.git 
-    #     cd $ROOT_PATH/cardano-node
-    # else
-    #     echo "Updating cardano-node source."
-    #     cd $ROOT_PATH/cardano-node
-    #     git fetch --all --recurse-submodules --tags
-    # fi
+    CARDANO_NODE_CLONE_DIR=$ROOT_PATH/cardano-node
+    if [ ! -d "$CARDANO_NODE_CLONE_DIR" ]; then
+        echo "Cloning cardano-node source."
+        cd $ROOT_PATH
+        git clone https://github.com/IntersectMBO/cardano-node.git 
+        cd $ROOT_PATH/cardano-node
+    else
+        echo "Updating cardano-node source."
+        cd $ROOT_PATH/cardano-node
+        git fetch --all --recurse-submodules --tags
+    fi
 
 
-    # git fetch --all --recurse-submodules --tags
-    # git tag | sort -V
-    # git checkout tags/$1
+    git fetch --all --recurse-submodules --tags
+    git tag | sort -V
+    git checkout tags/$1
     
 
-    # echo
-    # git describe --tags
+    echo
+    git describe --tags
 
-    # echo
-    # if ! promptyn "Is this the correct tag? (y/n)"; then
-    #     echo "Ok bye!"
-    #     exit 1
-    # fi
+    echo
+    if ! promptyn "Is this the correct tag? (y/n)"; then
+        echo "Ok bye!"
+        exit 1
+    fi
 
-    # # echo "with-compiler: ghc-8.10.7" >> cabal.project.local
-    # echo "with-compiler: ghc-9.6.3" >> cabal.project.local
+    # echo "with-compiler: ghc-8.10.7" >> cabal.project.local
+    echo "with-compiler: ghc-9.6.3" >> cabal.project.local
 
-    # cabal clean
-    # cabal update
-    # # cabal build all
-    # cabal build cardano-node
-    # cabal build cardano-cli
+    cabal clean
+    cabal update
+    # cabal build all
+    cabal build cardano-node
+    cabal build cardano-cli
 
     echo
     if ! promptyn "Build complete, ready to stop/restart services? (y/n)"; then
@@ -146,11 +146,11 @@ if [[ $NODE_TYPE == "bp" ]]; then
         if [[ $status == 0 ]] ; then
             echo "Online"
             echo '---------------- Stopping node services... ----------------'
-            ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'sudo systemctl stop run.relay'
+            ssh -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} cardano@${RELAY_IPS[$i]} 'sudo systemctl stop run.relay'
             echo '---------------- Copying cardano binaries... ----------------'
-            scp -i ~/.ssh/${RELAY_NAMES[$i]}.pem ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
+            scp -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
             echo '---------------- Starting node services... ----------------'
-            ssh -i ~/.ssh/${RELAY_NAMES[$i]}.pem cardano@${RELAY_IPS[$i]} 'sudo systemctl start run.relay'
+            ssh -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} cardano@${RELAY_IPS[$i]} 'sudo systemctl start run.relay'
 
             echo "Node binaries update completed on ${RELAY_NAMES[$i]} node!"
         else
