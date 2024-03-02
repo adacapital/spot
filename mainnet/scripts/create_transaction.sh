@@ -17,7 +17,6 @@ echo "ROOT_PATH: $ROOT_PATH"
 echo "NS_PATH: $NS_PATH"
 echo "TOPO_FILE: $TOPO_FILE"
 
-
 # importing utility functions
 source $NS_PATH/utils.sh
 
@@ -119,8 +118,8 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     fi
 
     # create working directory for the transaction
-    mkdir -p ~/transactions
-    cd ~/transactions
+    mkdir -p $ROOT_PATH/transactions
+    cd $ROOT_PATH/transactions
     mkdir $NOW
     cd $NOW
     CUR_DIR=`pwd`

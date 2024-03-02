@@ -127,7 +127,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 3 && $STATE
     echo "GIST_FILE_NAME: $GIST_FILE_NAME"
     echo "META_URL: $META_URL"
     if ! promptyn "Please confirm you want to proceed? (y/n)"; then
-        echo "Ok bye!"
+        echo "Ok bye!"clea
         exit 1
     fi
 
@@ -234,19 +234,10 @@ fi" >> ~/.bashrc
     echo '#!/bin/bash
 ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
 mv pool-registration.cert $ROOT_PATH/pool_keys
-mv delegation.cert $HOME/pool_keys
-chmod 400 $HOME/pool_keys/pool-registration.cert
-chmod 400 $HOME/pool_keys/delegation.cert
+mv delegation.cert $ROOT_PATH/pool_keys
+chmod 400 $ROOT_PATH/pool_keys/pool-registration.cert
+chmod 400 $ROOT_PATH/pool_keys/delegation.cert
 echo "state applied, please now run update_pool_registration.sh"' > $STATE_APPLY_SCRIPT
-
-
-#     echo "#!/bin/bash
-# ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
-# mv pool-registration.cert \$ROOT_PATH/pool_keys
-# mv delegation.cert \$HOME/pool_keys
-# chmod 400 \$HOME/pool_keys/pool-registration.cert
-# chmod 400 \$HOME/pool_keys/delegation.cert
-# echo \"state applied, please now run update_pool_registration.sh\"" > $STATE_APPLY_SCRIPT
 
     echo
     echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh, then come back to this prompt..."

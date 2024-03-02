@@ -6,8 +6,17 @@
 NOW=`date +"%Y%m%d_%H%M%S"`
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
+PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
+ROOT_PATH="$(realpath "$(dirname "$PARENT1")")"
 NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+TOPO_FILE=$ROOT_PATH/pool_topology
+
+echo "ROTATE KES KEYS STARTING..."
+echo "SCRIPT_DIR: $SCRIPT_DIR"
+echo "SPOT_DIR: $SPOT_DIR"
+echo "ROOT_PATH: $ROOT_PATH"
+echo "NS_PATH: $NS_PATH"
+echo "TOPO_FILE: $TOPO_FILE"
 
 # importing utility functions
 source $NS_PATH/utils.sh
@@ -55,7 +64,7 @@ if [[ $NODE_TYPE == "airgap" ]]; then
 fi
 
 # getting the script state ready
-STATE_FILE="$HOME/spot.state"
+STATE_FILE="$ROOT_PATH/spot.state"
 
 if [ -f "$STATE_FILE" ]; then
     # Source the state file to restore state
@@ -97,24 +106,24 @@ fi
 print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE
 
 if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_init" ]]; then
-    cd $HOME
+    cd $ROOT_PATH
     mkdir -p pool_keys
     cd pool_keys
 
-    if [ -f "$HOME/pool_keys/kes.skey" ]; then
+    if [ -f "$ROOT_PATH/pool_keys/kes.skey" ]; then
         echo
         echo '---------------- Backing up previous KES key pair ----------------'
-        chmod 664 $HOME/pool_keys/kes.skey
-        mv $HOME/pool_keys/kes.skey $HOME/pool_keys/kes.skey.$NOW
-        chmod 400 $HOME/pool_keys/kes.skey.$NOW
+        chmod 664 $ROOT_PATH/pool_keys/kes.skey
+        mv $ROOT_PATH/pool_keys/kes.skey $ROOT_PATH/pool_keys/kes.skey.$NOW
+        chmod 400 $ROOT_PATH/pool_keys/kes.skey.$NOW
     fi
 
-    if [ -f "$HOME/pool_keys/node.cert" ]; then
+    if [ -f "$ROOT_PATH/pool_keys/node.cert" ]; then
         echo
         echo '---------------- Backing up previous operational certificate ----------------'
-        chmod 664 $HOME/pool_keys/node.cert
-        mv $HOME/pool_keys/node.cert $HOME/pool_keys/node.cert.$NOW
-        chmod 400 $HOME/pool_keys/node.cert.$NOW
+        chmod 664 $ROOT_PATH/pool_keys/node.cert
+        mv $ROOT_PATH/pool_keys/node.cert $ROOT_PATH/pool_keys/node.cert.$NOW
+        chmod 400 $ROOT_PATH/pool_keys/node.cert.$NOW
     fi
 
     echo
@@ -129,7 +138,7 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE
     echo
     echo '---------------- Gathering some information to generate the operational certificate ----------------'
 
-    SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
+    SLOTSPERKESPERIOD=$(cat $ROOT_PATH/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
     CTIP=$(cardano-cli query tip --mainnet | jq -r .slot)
     KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
     STATE_SUB_STEP_ID="rotate_kes_keys_opcert_gen"
@@ -140,30 +149,31 @@ if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE
     echo "KES_PERIOD: $KES_PERIOD"
 
     # copy certain files back to the air-gapped environment to continue operation there
-    STATE_APPLY_SCRIPT=$HOME/apply_state.sh
+    STATE_APPLY_SCRIPT=$ROOT_PATH/apply_state.sh
     echo
     echo "Please move the following files back to your air-gapped environment in your home directory and run apply_state.sh."
     echo $STATE_FILE
-    echo $HOME/pool_keys/kes.vkey
+    echo $ROOT_PATH/pool_keys/kes.vkey
     echo $STATE_APPLY_SCRIPT
 
-    echo "#!/bin/bash
+    echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
 echo
 echo '---------------- Backing up previous KES key pair ----------------'
-chmod 664 \$HOME/pool_keys/kes.vkey
-mv \$HOME/pool_keys/kes.vkey \$HOME/pool_keys/kes.vkey.$NOW
-chmod 400 \$HOME/pool_keys/kes.vkey.$NOW
+chmod 664 $ROOT_PATH/pool_keys/kes.vkey
+mv $ROOT_PATH/pool_keys/kes.vkey $ROOT_PATH/pool_keys/kes.vkey.$NOW
+chmod 400 $ROOT_PATH/pool_keys/kes.vkey.$NOW
 echo '---------------- Backing up previous operational certificate ----------------'
-chmod 664 \$HOME/pool_keys/node.cert
-mv \$HOME/pool_keys/node.cert \$HOME/pool_keys/node.cert.$NOW
-chmod 400 \$HOME/pool_keys/node.cert.$NOW
-mv kes.vkey \$HOME/pool_keys
-chmod 400 \$HOME/pool_keys/kes.vkey
-echo \"state applied, please now run rotate_kes_keys.sh\"" > $STATE_APPLY_SCRIPT
+chmod 664 $ROOT_PATH/pool_keys/node.cert
+mv $ROOT_PATH/pool_keys/node.cert $ROOT_PATH/pool_keys/node.cert.$NOW
+chmod 400 $ROOT_PATH/pool_keys/node.cert.$NOW
+mv kes.vkey $ROOT_PATH/pool_keys
+chmod 400 $ROOT_PATH/pool_keys/kes.vkey
+echo "state applied, please now run rotate_kes_keys.sh"' > $STATE_APPLY_SCRIPT
 fi
 
 if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_opcert_gen" ]]; then
-    cd $HOME
+    cd $ROOT_PATH
     mkdir -p pool_keys
     cd pool_keys
 
@@ -171,9 +181,9 @@ if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 4 && $S
     echo '---------------- Generating the operational certificate ----------------'
 
     cardano-cli node issue-op-cert \
-    --kes-verification-key-file $HOME/pool_keys/kes.vkey \
-    --cold-signing-key-file $HOME/cold_keys/cold.skey \
-    --operational-certificate-issue-counter $HOME/cold_keys/cold.counter \
+    --kes-verification-key-file $ROOT_PATH/pool_keys/kes.vkey \
+    --cold-signing-key-file $ROOT_PATH/cold_keys/cold.skey \
+    --operational-certificate-issue-counter $ROOT_PATH/cold_keys/cold.counter \
     --kes-period $KES_PERIOD \
     --out-file node.cert
 
@@ -195,16 +205,17 @@ fi" >> ~/.bashrc
 
     # copy certain files to usb key to continue operations on bp node
     cp $STATE_FILE $SPOT_USB_KEY
-    cp $HOME/pool_keys/node.cert $SPOT_USB_KEY
+    cp $ROOT_PATH/pool_keys/node.cert $SPOT_USB_KEY
     STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
-    echo "#!/bin/bash
-mkdir -p \$HOME/pool_keys
-mv node.cert \$HOME/pool_keys
-chmod 400 \$HOME/pool_keys/node.cert
+    echo '#!/bin/bash
+ROOT_PATH="$(realpath "$(dirname "$(dirname "$(dirname "$(dirname "$0")")")")")"
+mkdir -p $ROOT_PATH/pool_keys
+mv node.cert $ROOT_PATH/pool_keys
+chmod 400 $ROOT_PATH/pool_keys/node.cert
 echo
 echo '---------------- Restarting bp node ----------------'
 sudo systemctl restart run.bp
-echo \"New KES keys installed and bp node restarted. Until next time...\"" > $STATE_APPLY_SCRIPT
+echo \"New KES keys installed and bp node restarted. Until next time...\"' > $STATE_APPLY_SCRIPT
 
     echo
     echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
