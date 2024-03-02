@@ -103,7 +103,8 @@ echo
 echo '---------------- Submit stake pool registration certificate and delegation certificate to the blockchain ----------------'
 
 # create a transaction to register our stake pool registration & delegation certificates onto the blockchain
-$NS_PATH/create_transaction.sh $(cat $ROOT_PATH/keys/paymentwithstake.addr) $(cat $ROOT_PATH/keys/paymentwithstake.addr) 0 $ROOT_PATH/keys/payment.skey $ROOT_PATH/keys/stake.skey $ROOT_PATH/pool_keys/cold.skey $ROOT_PATH/pool_keys/pool-registration.cert $ROOT_PATH/pool_keys/delegation.cert
+$NS_PATH/create_transaction_online.sh $(cat $ROOT_PATH/keys/paymentwithstake.addr) $(cat $ROOT_PATH/keys/paymentwithstake.addr) 0 $ROOT_PATH/keys/payment.skey $ROOT_PATH/keys/stake.skey $ROOT_PATH/pool_keys/cold.skey $ROOT_PATH/pool_keys/pool-registration.cert $ROOT_PATH/pool_keys/delegation.cert
+# $NS_PATH/create_transaction_online.sh $(cat $ROOT_PATH/keys/payment2.addr) $(cat $ROOT_PATH/keys/payment2.addr) 0 $ROOT_PATH/keys/payment.skey $ROOT_PATH/keys/stake.skey $ROOT_PATH/pool_keys/cold.skey $ROOT_PATH/pool_keys/pool-registration.cert $ROOT_PATH/pool_keys/delegation.cert
 
 # checking that our pool registration was successful
 # $NS_PATH/pool_info.sh
