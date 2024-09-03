@@ -51,7 +51,8 @@ fi
 
 NODE_PATH="${ROOT_PATH}/node.${NODE_TYPE}"
 MAGIC=$(get_network_magic)
-LATEST_TAG=$(curl -s https://api.github.com/repos/cardano-community/cncli/releases/latest | jq -r .tag_name)
+# LATEST_TAG=$(curl -s https://api.github.com/repos/cardano-community/cncli/releases/latest | jq -r .tag_name)
+LATEST_TAG="v6.2.0"
 echo "NETWORK_MAGIC: $MAGIC"
 echo "NODE_PATH: $NODE_PATH"
 echo "LATEST_TAG: $LATEST_TAG"
@@ -65,36 +66,52 @@ fi
 if [[ $NODE_TYPE == "bp" ]]; then
     echo
     echo '---------------- Building CNCLI binary from source ----------------'
-    echo '--------- Prepare RUST environment -------'
-    mkdir -p $HOME/.cargo/bin
-    chown -R $USER\: $HOME/.cargo
-    touch $HOME/.profile
-    chown $USER\: $HOME/.profile
+    # echo '--------- Prepare RUST environment -------'
+    # mkdir -p $HOME/.cargo/bin
+    # chown -R $USER\: $HOME/.cargo
+    # touch $HOME/.profile
+    # chown $USER\: $HOME/.profile
 
-    echo '--------- Install rustup - proceed with default install (option 1) -------'
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-    source $HOME/.cargo/env
-    rustup install stable
-    rustup default stable
-    rustup update
-    rustup component add clippy rustfmt
-    # rustup target add x86_64-unknown-linux-musl
-    rustup target add aarch64-unknown-linux-gnu
+    # echo '--------- Install rustup - proceed with default install (option 1) -------'
+    # curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    # source $HOME/.cargo/env
+    # rustup install stable
+    # rustup default stable
+    # rustup update
+    # rustup component add clippy rustfmt
+    # # rustup target add x86_64-unknown-linux-musl
+    # rustup target add aarch64-unknown-linux-gnu
+
 
     echo '--------- Install dependencies and build cncli -------'
     source $HOME/.cargo/env
-    sudo apt-get update -y && sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf musl-tools
+    # sudo apt-get update -y && sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf musl-tools
     cd ~/data/download
-    git clone --recurse-submodules https://github.com/cardano-community/cncli
+    rm -rf ./cncli
+
+    # git clone --recurse-submodules https://github.com/cardano-community/cncli
+    git clone https://github.com/cardano-community/cncli.git
+    git fetch --all --recurse-submodules --tags
     cd cncli
-    git checkout $LATEST_TAG
+    # git checkout $LATEST_TAG
+    git checkout tags/$LATEST_TAG
+
+    echo
+    git describe --tags
+
+    echo
+    if ! promptyn "Is this the correct tag? (y/n)"; then
+        echo "Ok bye!"
+        exit 1
+    fi
+
     # cargo install --path . --force
     cargo install --path . --force --target aarch64-unknown-linux-gnu
     cncli --version
     command -v cncli
     sudo cp /home/cardano/.cargo/bin/cncli /usr/local/bin
 
-      if ! promptyn "Please confirm you want to proceed? (y/n)"; then
+      if ! promptyn "Please confirm you want to deploy as a service? (y/n)"; then
         echo "Ok bye!"
         exit 1
     fi
@@ -103,35 +120,35 @@ if [[ $NODE_TYPE == "bp" ]]; then
     BLOCKPRODUCING_IP=$BP_IP
     BLOCKPRODUCING_PORT=3000
 
-    mkdir -p $ROOT_PATH/node.bp/cncli
+#     mkdir -p $ROOT_PATH/node.bp/cncli
 
-    cat > $ROOT_PATH/node.bp/cncli/cncli_sync.service << EOF
-[Unit]
-Description=CNCLI Sync
-After=multi-user.target
+#     cat > $ROOT_PATH/node.bp/cncli/cncli_sync.service << EOF
+# [Unit]
+# Description=CNCLI Sync
+# After=multi-user.target
 
-[Service]
-User=$USER
-Type=simple
-Restart=always
-RestartSec=5
-LimitNOFILE=131072
-ExecStart=/home/cardano/.cargo/bin/cncli sync --network-magic $MAGIC --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $ROOT_PATH/node.bp/cncli/cncli.db --shelley-genesis-hash $SHELLEY_GENESIS_HASH
-KillSignal=SIGINT
-SuccessExitStatus=143
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=cncli_sync
+# [Service]
+# User=$USER
+# Type=simple
+# Restart=always
+# RestartSec=5
+# LimitNOFILE=131072
+# ExecStart=/home/cardano/.cargo/bin/cncli sync --network-magic $MAGIC --host $BLOCKPRODUCING_IP --port $BLOCKPRODUCING_PORT --db $ROOT_PATH/node.bp/cncli/cncli.db --shelley-genesis-hash $SHELLEY_GENESIS_HASH
+# KillSignal=SIGINT
+# SuccessExitStatus=143
+# StandardOutput=syslog
+# StandardError=syslog
+# SyslogIdentifier=cncli_sync
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# [Install]
+# WantedBy=multi-user.target
+# EOF
 
-    sudo mv $ROOT_PATH/node.bp/cncli/cncli_sync.service /etc/systemd/system/cncli_sync.service
+#     sudo mv $ROOT_PATH/node.bp/cncli/cncli_sync.service /etc/systemd/system/cncli_sync.service
 
-    sudo systemctl daemon-reload
-    sudo systemctl enable cncli_sync
-    sudo systemctl start cncli_sync.service
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable cncli_sync
+#     sudo systemctl start cncli_sync.service
 
     # note cncli service logs can be seen in /var/log/syslog
 else

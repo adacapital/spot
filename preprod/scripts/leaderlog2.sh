@@ -73,7 +73,8 @@ if [[ $NODE_TYPE == "bp" ]]; then
             --pool-stake $1 \
             --active-stake $2 \
             --ledger-set $EPOCH \
-            --tz $TIMEZONE
+            --tz $TIMEZONE \
+            --consensus cpraos 
     }
 
     if [[ $CNCLI_STATUS == "ok" ]]; then
