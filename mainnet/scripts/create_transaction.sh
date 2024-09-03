@@ -272,7 +272,7 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     fi
 
     # calculate the transaction fee and the final balance for SOURCE_PAYMENT_ADDR
-    FEE=$(cardano-cli transaction calculate-min-fee \
+    FEE_RAW=$(cardano-cli transaction calculate-min-fee \
     --tx-body-file tx.raw.draft \
     --tx-in-count ${TXCNT} \
     --tx-out-count ${TXOCNT} \
@@ -281,9 +281,14 @@ if [[ $STATE_SUB_STEP_ID == "build.trans" && $IS_AIR_GAPPED == 0 ]]; then
     --mainnet \
     --protocol-params-file protocol.json | awk '{print $1}')
 
+    # Add 10,000 lovelace to the estimated fee
+    FEE=$(expr $FEE_RAW + 10000)
+
     echo "TOTAL_BALANCE: ${TOTAL_BALANCE}"
     echo "LOVELACE_AMOUNT: ${LOVELACE_AMOUNT}"
-    echo "FEE: ${FEE}"
+    echo "FEE (raw): ${FEE_RAW}"
+    echo "FEE (final): ${FEE}"
+
 
     UTXO_LOVELACE_BALANCE_FINAL=$(expr $TOTAL_BALANCE - $LOVELACE_AMOUNT - $FEE)
 
