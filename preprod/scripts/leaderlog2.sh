@@ -74,7 +74,7 @@ if [[ $NODE_TYPE == "bp" ]]; then
             --active-stake $2 \
             --ledger-set $EPOCH \
             --tz $TIMEZONE \
-            --consensus cpraos 
+            --consensus praos 
     }
 
     if [[ $CNCLI_STATUS == "ok" ]]; then
