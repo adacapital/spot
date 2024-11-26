@@ -23,7 +23,7 @@ echo
 source $NS_PATH/utils.sh
 
 # calculating the shelley hash
-SHELLEY_GENESIS_HASH=$(cardano-cli genesis hash --genesis $ROOT_PATH/node.bp/config/sgenesis.json)
+# SHELLEY_GENESIS_HASH=$(cardano-cli genesis hash --genesis $ROOT_PATH/node.bp/config/sgenesis.json)
 
 echo
 echo '---------------- Reading pool topology file and preparing a few things... ----------------'
@@ -52,14 +52,14 @@ fi
 NODE_PATH="${ROOT_PATH}/node.${NODE_TYPE}"
 MAGIC=$(get_network_magic)
 # LATEST_TAG=$(curl -s https://api.github.com/repos/cardano-community/cncli/releases/latest | jq -r .tag_name)
-LATEST_TAG="v6.2.0"
+LATEST_TAG="v6.5.1"
 echo "NETWORK_MAGIC: $MAGIC"
 echo "NODE_PATH: $NODE_PATH"
 echo "LATEST_TAG: $LATEST_TAG"
-echo "SHELLEY_GENESIS_HASH: $SHELLEY_GENESIS_HASH"
+# echo "SHELLEY_GENESIS_HASH: $SHELLEY_GENESIS_HASH"
 
 if ! promptyn "Please confirm you want to proceed? (y/n)"; then
-    echo "Ok bye!"
+    echo "Ok bye!"e
     exit 1
 fi
 
