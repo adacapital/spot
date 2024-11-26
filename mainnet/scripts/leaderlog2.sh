@@ -54,7 +54,7 @@ echo "NODE_PATH: $NODE_PATH"
 if [[ $NODE_TYPE == "bp" ]]; then
     CNCLI_STATUS=$($NS_PATH/cncli_status.sh | jq -r .status)
     EPOCH="${1:-next}"
-    TIMEZONE="${2:-UTC}"
+    TIMEZONE="${2:-Europe/London}"
     POOL_ID=$(cat $ROOT_PATH/node.bp/pool_info.json | jq -r .pool_id_hex)
     echo "EPOCH: $EPOCH"
     echo "TIMEZONE: $TIMEZONE"
