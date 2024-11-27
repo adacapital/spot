@@ -222,12 +222,12 @@ mkdir -p ~/$NODE_DIR/config
 mkdir -p ~/$NODE_DIR/socket
 mkdir -p ~/$NODE_DIR/logs
 cd ~/$NODE_DIR/config
-wget -O config.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-config.json
-wget -O bgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-byron-genesis.json
-wget -O sgenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-shelley-genesis.json
-wget -O agenesis.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-alonzo-genesis.json
-wget -O topology.json https://hydra.iohk.io/job/Cardano/cardano-node/cardano-deployment/latest-finished/download/1/mainnet-topology.json
-wget -O cgenesis.json https://raw.githubusercontent.com/input-output-hk/cardano-world/8.x-integration/nix/cardano/environments/mainnet/conway-genesis.json
+wget -O config.json https://book.world.dev.cardano.org/environments/mainnet/config-bp.json
+wget -O bgenesis.json https://book.world.dev.cardano.org/environments/mainnet/byron-genesis.json
+wget -O sgenesis.json https://book.world.dev.cardano.org/environments/mainnet/shelley-genesis.json
+wget -O agenesis.json https://book.world.dev.cardano.org/environments/mainnet/alonzo-genesis.json
+wget -O topology.json https://book.world.dev.cardano.org/environments/mainnet/topology.json
+wget -O cgenesis.json https://book.world.dev.cardano.org/environments/mainnet/conway-genesis.json
 
 # prepare config.json
 
