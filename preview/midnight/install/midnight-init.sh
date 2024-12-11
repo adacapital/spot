@@ -47,3 +47,5 @@ sudo ufw enable
 
 sudo ufw status verbose
 
+echo "Make sure to add eport 1337 & 1442 to your NSG & Egress rules too!"
+

@@ -34,38 +34,14 @@ fi
 
 
 cd $INSTALL_PATH
-mkdir -p partner-chains
-cd partner-chains
+mkdir -p partner-chains-v1
+cd partner-chains-v1
 
-# # Download the cli & node binaries
-# wget -O partner-chains-cli https://github.com/input-output-hk/partner-chains/releases/download/v1.3.0/partner-chains-cli-v1.3.0-x86_64-linux
+wget https://github.com/input-output-hk/partner-chains/releases/download/v1.1.0/linux_x86_64.zip
 
-# chmod 775 partner-chain-cli
+unzip linux_x86_64.zip
 
-# wget -O partner-chains-node https://github.com/input-output-hk/partner-chains/releases/download/v1.3.0/partner-chains-node-v1.3.0-x86_64-linux
-
-# chmod 775 partner-chains-node
-
-# Create the /pc-contracts-cli directory
-mkdir -p ./pc-contracts-cli
-
-# Change into the newly created directory
-cd pc-contracts-cli
-
-# Download the ZIP file
-wget https://github.com/input-output-hk/partner-chains-smart-contracts/releases/download/v7.0.1/pc-contracts-cli-v7.0.1.zip
-wget https://github.com/input-output-hk/partner-chains-smart-contracts/releases/download/v7.0.0/pc-contracts-cli-v7.0.0.zip
-
-# Unzip the downloaded file in the current directory
-unzip pc-contracts-cli-v7.0.1.zip
-unzip pc-contracts-cli-v7.0.0.zip
-
-# Clean up by removing the ZIP file (optional)
-rm pc-contracts-cli-v7.0.1.zip
-rm pc-contracts-cli-v7.0.0.zip
-
-mv pc-contracts-cli pc-contracts-cli.js
-
+find . -name "*.zip" -exec unzip {} \; -exec rm {} \;
 
 # Define the JSON content
 json_content=$(cat <<EOF
