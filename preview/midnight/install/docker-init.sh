@@ -55,3 +55,16 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io
 echo "Verify the Installation"
 echo
 sudo docker run hello-world
+
+echo "Make sure to update /etc/docker/daemon.json"
+echo "{"
+echo "   "iptables": false"
+echo "}"
+echo "Then run:"
+echo "sudo systemctl restart docker"
+sudo "ufw status"
+
+sudo apt install direnv
+
+echo "Append the following to your .bashrc and open new terminal:"
+echo "eval "$(direnv hook bash)""
