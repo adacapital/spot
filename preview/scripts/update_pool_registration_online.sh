@@ -37,7 +37,7 @@ echo '---------------- Create a JSON file with you testnet pool metadata -------
 # URL_TO_RAW_GIST_FILE="https://gist.githubusercontent.com/adacapital/b93aafb9c1a06c978cfadb8ca18db41a/raw/64b51332b5e5dfdb095e425d70c0c953c2758ef6/$GIST_FILE_NAME"
 # META_URL="https://bit.ly/3R6eD2V"
 
-GIST_FILE_NAME="adact_preprod.json"
+GIST_FILE_NAME="adact_preview.json"
 META_URL="https://adacapital.io/$GIST_FILE_NAME"
 
 echo "META_URL: $META_URL"

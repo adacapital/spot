@@ -334,7 +334,7 @@ tput civis
 draw_box
 
 # Header & labels
-goto 0 1; printf " %b● Midnight Node Monitor%b  (%s %s  %s)" "$CD$B" "$N" "$(node_name || echo Midnight)" "$(node_version || echo ?)" "$(node_role || echo ?)"
+goto 0 1; printf " %b● ADA Capital (ADACT) - Midnight Node Monitor%b  (%s %s  %s)" "$CD$B" "$N" "$(node_name || echo Midnight)" "$(node_version || echo ?)" "$(node_role || echo ?)"
 hr_at 1
 goto 2 0;  printf "%bUptime:%b "     "$C1$B" "$N"
 goto 3 0;  printf "%bStart Time:%b " "$C1$B" "$N"
