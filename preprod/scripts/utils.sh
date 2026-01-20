@@ -41,7 +41,7 @@ print_state () {
 # spot topology utils
 get_topo () {
     TOPO_FILE=$1
-    MY_IP=$(hostname -I | xargs)
+    MY_IP=$(hostname -I | awk '{print $1}')
     NODE_TYPE="unknown"
     BP_IP=""
     RELAY_IPS=()
