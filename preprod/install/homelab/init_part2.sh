@@ -8,15 +8,23 @@ set -euo pipefail
 # What this script DOES:
 # - Reads pool_topology to determine NODE_TYPE (bp|relay), BP_IP, relay list
 # - Creates node directory structure under ~/node.bp or ~/node.relay
-# - Downloads preprod config + genesis + default topology
-# - Builds a node-appropriate topology.json
+# - Downloads preprod config + genesis + default topology + peer-snapshot
+# - Patches book topology.json: useLedgerAfterSlot -> 0 (idempotent)
+# - Builds node-appropriate topology:
+#     * BP keeps book topology.json (relay-like), also writes topology_bp.json (true-BP local-only)
+#     * Relay mutates book topology.json by adding localRoots for BP + other relays
 # - Applies minimal, safe config tweaks (genesis filenames + EKG ports per node type)
 # - Writes run scripts (relay-like and bp-producing placeholder)
 # - Installs systemd service for the node (enabled)
 # - Installs/patches gLiveView
 # - Sets SPOT_PATH and CARDANO_NODE_SOCKET_PATH via an idempotent .bashrc block
 #
-# What this script DOES NOT do (moved to init_part3.sh):
+# Added modes:
+#   --topology-only : refresh book files + patch + build topology, then exit
+#   --prepare-only  : dirs + download + patch + config patch + build topology, then exit
+#                    (skips binary discovery + run scripts + systemd + gLiveView)
+#
+# What this script DOES NOT do (moved to init_part3.sh / part4):
 # - Copy binaries to relays
 # - Copy/sync chain DB between nodes
 # ------------------------------------------------------------
@@ -39,22 +47,19 @@ RELAY_PORT="${RELAY_PORT:-3001}"
 BASE_URL="https://book.world.dev.cardano.org/environments/${ENV_NAME}"
 
 ONLY_TOPOLOGY=0
+PREPARE_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --topology-only) ONLY_TOPOLOGY=1 ;;
+    --prepare-only)  PREPARE_ONLY=1 ;;
   esac
 done
-
 
 # ------------------------------------------------------------
 # helpers
 # ------------------------------------------------------------
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo -e "\n[$(date +"%F %T")] $*"; }
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
-}
 
 apt_install_if_missing() {
   local pkgs=("$@")
@@ -132,10 +137,55 @@ discover_binaries() {
   echo "$node_bin" "$cli_bin"
 }
 
+download_env_files() {
+  local node_dir="$1"
+  local node_type="$2"
+
+  log "Downloading ${ENV_NAME} config/genesis/topology/peer-snapshot..."
+  cd "$HOME/$node_dir/config"
+
+  # Correct templates from book.world.dev.cardano.org:
+  # - BP uses config-bp.json
+  # - Relay uses config.json
+  if [[ "$node_type" == "bp" ]]; then
+    fetch "$BASE_URL/config-bp.json" "config.json"
+  else
+    fetch "$BASE_URL/config.json" "config.json"
+  fi
+
+  fetch "$BASE_URL/byron-genesis.json" "bgenesis.json"
+  fetch "$BASE_URL/shelley-genesis.json" "sgenesis.json"
+  fetch "$BASE_URL/alonzo-genesis.json" "agenesis.json"
+  fetch "$BASE_URL/conway-genesis.json" "cgenesis.json"
+
+  # Book template topology + its referenced snapshot
+  fetch "$BASE_URL/topology.json" "topology.json"
+  fetch "$BASE_URL/peer-snapshot.json" "peer-snapshot.json"
+}
+
+patch_topology_useLedgerAfterSlot() {
+  local topo_path="$1"
+  local desired="${2:-0}"
+
+  [[ -f "$topo_path" ]] || die "topology file not found: $topo_path"
+
+  if jq -e 'has("useLedgerAfterSlot")' "$topo_path" >/dev/null 2>&1; then
+    local tmp
+    tmp="$(mktemp)"
+    jq --argjson v "$desired" '.useLedgerAfterSlot = $v' "$topo_path" > "$tmp"
+    mv "$tmp" "$topo_path"
+    log "Patched useLedgerAfterSlot -> $desired in: $topo_path"
+  else
+    log "No useLedgerAfterSlot key in: $topo_path (skipping)"
+  fi
+}
+
 patch_config_minimal() {
   local node_dir="$1"      # node.bp or node.relay
   local node_type="$2"     # bp or relay
   local cfg="$HOME/$node_dir/config/config.json"
+
+  [[ -f "$cfg" ]] || die "config.json not found at: $cfg (download step failed?)"
 
   # ---- 1) Ensure genesis filenames match our downloaded local names ----
   sed -i \
@@ -158,7 +208,6 @@ patch_config_minimal() {
     log_path="$HOME/node.relay/logs/node0.json"
   fi
 
-  # ---- 3) Patch JSON safely with jq using a heredoc filter ----
   local tmp
   tmp="$(mktemp)"
 
@@ -167,13 +216,8 @@ patch_config_minimal() {
     --argjson pport "$prometheus_port" \
     --arg logPath "$log_path" \
     -f <(cat <<'JQFILTER'
-# --- hasEKG ---
 (if has("hasEKG") then .hasEKG = $ekg else . end)
-
-# --- hasPrometheus ---
 | .hasPrometheus = ["127.0.0.1", $pport]
-
-# --- defaultScribes: ensure Stdout + canonical FileSK(logPath) ---
 | .defaultScribes =
     (
       (.defaultScribes // [])
@@ -187,8 +231,6 @@ patch_config_minimal() {
           + [["FileSK",$logPath]]
         )
     )
-
-# --- setupScribes: ensure Stdout + canonical FileSK(logPath) with ScJson ---
 | .setupScribes =
     (
       (.setupScribes // [])
@@ -224,8 +266,7 @@ build_topology() {
   local bp_ip="$3"
   shift 3
 
-  # Next arguments: relay_ips array, then a literal marker, then relay_names array
-  # Usage: build_topology "$NODE_DIR" "$NODE_TYPE" "$BP_IP" "${RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
+  # Args: relay_ips... --names relay_names...
   local relay_ips=()
   local relay_names=()
   local parsing_names=0
@@ -241,27 +282,43 @@ build_topology() {
     fi
   done
 
-  local topo="$HOME/$node_dir/config/topology_test.json"
+  local cfg_dir="$HOME/$node_dir/config"
+  local topo_main="$cfg_dir/topology.json"           # the live topology used by the node
+  local topo_bp="$cfg_dir/topology_bp.json"          # BP-only: the "true BP" topology (local-only)
+  local peer_snapshot="$cfg_dir/peer-snapshot.json"
 
-  if [[ "$node_type" == "bp" ]]; then
-    # Build localRoots.accessPoints from relay list
-    local n="${#relay_ips[@]}"
-    (( n > 0 )) || die "BP topology: no relays provided in pool_topology"
+  mkdir -p "$cfg_dir"
 
-    # If relay_names missing, generate default names
-    if (( ${#relay_names[@]} != n )); then
-      relay_names=()
-      for ((i=0; i<n; i++)); do relay_names+=("Relay$((i+1))"); done
+  # Helper: build accessPoints JSON array from ip+name lists and a port
+  build_access_points_array() {
+    local -n _ips=$1
+    local -n _names=$2
+    local _port=$3
+    local n="${#_ips[@]}"
+
+    if (( ${#_names[@]} != n )); then
+      _names=()
+      for ((i=0; i<n; i++)); do _names+=("Node$((i+1))"); done
     fi
 
-    # Build accessPoints array
-    local access_points
-    access_points="$(
+    (
       for ((i=0; i<n; i++)); do
-        jq -n --arg a "${relay_ips[$i]}" --arg n "${relay_names[$i]}" --argjson p "$RELAY_PORT" \
+        jq -n --arg a "${_ips[$i]}" --arg n "${_names[$i]}" --argjson p "$_port" \
           '{address:$a, port:$p, name:$n}'
-      done | jq -s .
-    )"
+      done
+    ) | jq -s .
+  }
+
+  if [[ "$node_type" == "bp" ]]; then
+    [[ -f "$topo_main" ]] || die "BP: missing $topo_main (download step didn't fetch book topology.json)"
+    [[ -f "$peer_snapshot" ]] || die "BP: missing $peer_snapshot (download step didn't fetch peer-snapshot.json)"
+
+    # Generate topology_bp.json: localRoots = relays, publicRoots empty
+    local n="${#relay_ips[@]}"
+    (( n > 0 )) || die "BP topology_bp.json: no relays provided in pool_topology"
+
+    local access_points
+    access_points="$(build_access_points_array relay_ips relay_names "$RELAY_PORT")"
 
     jq -n \
       --argjson ap "$access_points" \
@@ -281,39 +338,69 @@ build_topology() {
             advertise: false
           }
         ]
-      }' > "$topo"
+      }' > "$topo_bp"
+
+    jq . "$topo_bp" >/dev/null
+    log "BP: kept book relay-like topology at: $topo_main"
+    log "BP: generated true-BP topology at:     $topo_bp"
 
   else
-    # Relay topology: put BP in localRoots.
-    # Keep publicRoots empty for now (you can later add bootstrap peers if desired).
-    local access_points
-    access_points="$(jq -n --arg a "$bp_ip" --arg n "BP" --argjson p "$BP_PORT" \
-      '[{address:$a, port:$p, name:$n}]'
-    )"
+    [[ -f "$topo_main" ]] || die "Relay: missing $topo_main (download step didn't fetch book topology.json)"
+    [[ -f "$peer_snapshot" ]] || die "Relay: missing $peer_snapshot (download step didn't fetch peer-snapshot.json)"
 
-    jq -n \
-      --argjson ap "$access_points" \
-      '{
-        localRoots: [
-          {
-            accessPoints: $ap,
-            advertise: false,
-            trustable: true,
-            valency: 1
-          }
-        ],
-        publicRoots: [
-          {
-            accessPoints: [],
-            advertise: false
-          }
-        ]
-      }' > "$topo"
+    # Add local peers: BP + other relays (excluding self)
+    local self_ip
+    self_ip="$(hostname -I | awk '{print $1}')"
+
+    local bp_only_ips=("$bp_ip")
+    local bp_only_names=("BP")
+
+    local relay_only_ips=()
+    local relay_only_names=()
+
+    for i in "${!relay_ips[@]}"; do
+      local rip="${relay_ips[$i]}"
+      local rname="${relay_names[$i]:-Relay$((i+1))}"
+      [[ "$rip" == "$self_ip" ]] && continue
+      relay_only_ips+=("$rip")
+      relay_only_names+=("$rname")
+    done
+
+    local bp_ap relay_ap local_access_points
+    bp_ap="$(build_access_points_array bp_only_ips bp_only_names "$BP_PORT")"
+    if (( ${#relay_only_ips[@]} > 0 )); then
+      relay_ap="$(build_access_points_array relay_only_ips relay_only_names "$RELAY_PORT")"
+      local_access_points="$(jq -n --argjson a "$bp_ap" --argjson b "$relay_ap" '$a + $b')"
+    else
+      local_access_points="$bp_ap"
+    fi
+
+    local tmp
+    tmp="$(mktemp)"
+    jq \
+      --argjson ap "$local_access_points" \
+      '
+      .localRoots = (.localRoots // []) |
+        # Remove any prior SPOT_LOCAL entry (idempotent)
+      .localRoots = (.localRoots | map(select(.name? != "SPOT_LOCAL"))) |
+        # Drop empty/placeholder localRoots entries (accessPoints missing or empty)
+      .localRoots = (.localRoots | map(select((.accessPoints? // []) | length > 0))) |
+      .localRoots += [
+        {
+          name: "SPOT_LOCAL",
+          accessPoints: $ap,
+          advertise: false,
+          trustable: true,
+          valency: ($ap | length)
+        }
+      ]
+      ' "$topo_main" > "$tmp"
+    mv "$tmp" "$topo_main"
+
+    jq . "$topo_main" >/dev/null
+    log "Relay: updated topology (book template + local peers) at: $topo_main"
   fi
-
-  jq . "$topo" >/dev/null
 }
-
 
 write_run_scripts() {
   local node_dir="$1"
@@ -325,7 +412,6 @@ write_run_scripts() {
   local run_relaylike="$HOME/$node_dir/run.relaylike.sh"
   local run_bp="$HOME/$node_dir/run.bp.sh"
 
-  # Relay-like runner (safe for BP sync as well because it has no KES/VRF/opcert args)
   cat > "$run_relaylike" <<EOF
 #!/bin/bash
 set -euo pipefail
@@ -343,8 +429,6 @@ exec "$node_bin" run \\
 EOF
   chmod +x "$run_relaylike"
 
-  # BP runner placeholder (producing mode): kept but NOT used until you add KES/VRF/opcert
-  # We keep it as a template so you can "promote" later safely.
   cat > "$run_bp" <<'EOF'
 #!/bin/bash
 set -euo pipefail
@@ -366,7 +450,6 @@ exec cardano-node run \
   --port __BP_PORT__ \
   --config "$NODE_HOME/config/config.json"
 EOF
-  # Patch placeholders
   sed -i "s|exec cardano-node|exec $node_bin|g" "$run_bp"
   sed -i "s|__BP_PORT__|$BP_PORT|g" "$run_bp"
   chmod +x "$run_bp"
@@ -425,7 +508,6 @@ install_gliveview() {
     chmod 755 gLiveView.sh
   )
 
-  # Patch env file robustly: replace line if exists, else append
   set_kv() {
     local key="$1"
     local value="$2"
@@ -487,12 +569,8 @@ sed 's/^/  /' "$TOPO_FILE"
 
 # get_topo output format:
 # echo "$ERROR $NODE_TYPE $BP_IP ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
-#
-# So RELAYS contains 3 concatenated lists: [all relay IPs][all relay names][all relay pub IPs]
-
 cnt=${#RELAYS[@]}
 
-# If there are no relays, cnt can be 0; that's valid (though not recommended).
 if (( cnt == 0 )); then
   RELAY_IPS=()
   RELAY_NAMES=()
@@ -505,7 +583,6 @@ else
   RELAY_NAMES=( "${RELAYS[@]:$n:$n}" )
   RELAY_IPS_PUB=( "${RELAYS[@]:$((2*n)):$n}" )
 
-  # sanity check: each relay should have IP+NAME+PUBIP
   (( ${#RELAY_IPS[@]} == ${#RELAY_NAMES[@]} )) || die "Relay IP/name count mismatch"
   (( ${#RELAY_IPS[@]} == ${#RELAY_IPS_PUB[@]} )) || die "Relay IP/pubIP count mismatch"
 fi
@@ -523,17 +600,38 @@ if [[ "$NODE_TYPE" == "relay" ]]; then
   NODE_PORT="$RELAY_PORT"
 fi
 
-if (( ONLY_TOPOLOGY == 1 )); then
-  log "Topology-only mode enabled: regenerating topology.json and exiting."
-  build_topology "$NODE_DIR" "$NODE_TYPE" "$BP_IP" "${RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
-  log "Done. Wrote: $HOME/$NODE_DIR/config/topology.json"
-  exit 0
-fi
-
-
 log "Preparing directories under ~/$NODE_DIR ..."
 ensure_dir_layout "$NODE_DIR"
 ensure_bashrc_block "$NODE_DIR"
+
+# Always ensure baseline book files exist so --topology-only is deterministic
+download_env_files "$NODE_DIR" "$NODE_TYPE"
+
+log "Patching topology.json (useLedgerAfterSlot -> 0)..."
+patch_topology_useLedgerAfterSlot "$HOME/$NODE_DIR/config/topology.json" 0
+
+if (( ONLY_TOPOLOGY == 1 )); then
+  log "Topology-only mode enabled: regenerating topology files and exiting."
+  build_topology "$NODE_DIR" "$NODE_TYPE" "$BP_IP" "${RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
+  log "Done. Wrote: $HOME/$NODE_DIR/config/topology.json (and BP also writes topology_bp.json)"
+  exit 0
+fi
+
+log "Patching config.json (minimal)..."
+patch_config_minimal "$NODE_DIR" "$NODE_TYPE"
+
+log "Building node-specific topology..."
+build_topology "$NODE_DIR" "$NODE_TYPE" "$BP_IP" "${RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
+
+if (( PREPARE_ONLY == 1 )); then
+  log "Prepare-only mode enabled: skipping binary discovery, run scripts, systemd unit, and gLiveView."
+  echo
+  echo "Next:"
+  echo "  - Run init_part3.sh on BP to distribute binaries (and later DB)."
+  echo "  - Then re-run init_part2.sh (without flags) on this host to install systemd + gLiveView."
+  echo
+  exit 0
+fi
 
 log "Discovering cardano binaries..."
 read -r CARDANO_NODE_BIN CARDANO_CLI_BIN < <(discover_binaries)
@@ -543,42 +641,15 @@ log "Versions:"
 "$CARDANO_NODE_BIN" --version || true
 "$CARDANO_CLI_BIN" --version || true
 
-log "Downloading preprod config/genesis/topology..."
-cd "$HOME/$NODE_DIR/config"
-
-if [[ "$NODE_TYPE" == "bp" ]]; then
-  fetch "$BASE_URL/config-bp.json" "config.json"
-else
-  fetch "$BASE_URL/config.json" "config.json"
-fi
-fetch "$BASE_URL/byron-genesis.json" "bgenesis.json"
-fetch "$BASE_URL/shelley-genesis.json" "sgenesis.json"
-fetch "$BASE_URL/alonzo-genesis.json" "agenesis.json"
-fetch "$BASE_URL/conway-genesis.json" "cgenesis.json"
-fetch "$BASE_URL/topology.json" "topology.json"
-
-# Minimal safe config patches (genesis names + EKG ports)
-log "Patching config.json (minimal)..."
-patch_config_minimal "$NODE_DIR" "$NODE_TYPE"
-
-# Build node-specific topology.json
-log "Building node-specific topology.json..."
-build_topology "$NODE_DIR" "$NODE_TYPE" "$BP_IP" "${RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
-
-
-# Write run scripts
 log "Writing run scripts..."
 write_run_scripts "$NODE_DIR" "$NODE_TYPE" "$CARDANO_NODE_BIN" "$ENV_NAME" "$NODE_PORT"
 
-# Install systemd unit
 if [[ "$NODE_TYPE" == "relay" ]]; then
   install_systemd_unit "$NODE_DIR" "$NODE_TYPE" "run.relay" "$HOME/$NODE_DIR/run.relaylike.sh"
 else
-  # For BP we initially use relaylike runner to sync safely
   install_systemd_unit "$NODE_DIR" "$NODE_TYPE" "run.bp" "$HOME/$NODE_DIR/run.relaylike.sh"
 fi
 
-# Install gLiveView (optional but useful)
 log "Installing gLiveView..."
 install_gliveview "$NODE_DIR" "$NODE_PORT"
 
@@ -596,4 +667,4 @@ else
   echo "  gLiveView:                             cd ~/$NODE_DIR && ./gLiveView.sh"
 fi
 echo
-echo "Note: chain DB copying + binary distribution is handled in init_part3.sh (not here)."
+echo "Note: binary distribution + chain DB copying is handled in init_part3.sh / part4."
