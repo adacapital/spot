@@ -1,6 +1,14 @@
 # Project exclusions
 **/_misc/*
 
+# Secrets / environment files
+*.env
+**/*.env
+
+# Allow env templates
+!*.env.example
+!**/*.env.example
+
 # Terraform
 .terraform/
 **/.terraform/
@@ -17,4 +25,5 @@
 # VSCode Files
 .vscode*
 
+# Logs
 *.log
