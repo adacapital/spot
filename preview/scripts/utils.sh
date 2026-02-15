@@ -63,7 +63,7 @@ get_topo () {
         
         while IFS= read -r TOPO; do
             # echo $TOPO
-            if [[ ! -z $TOPO ]]; then
+            if [[ ! -z $TOPO ]] && [[ "$TOPO" != \#* ]]; then
                 TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
                 TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
                 TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
@@ -75,9 +75,17 @@ get_topo () {
 
                 if [[ $TOPO_IP == $MY_IP ]]; then
                     if [[ "$TOPO_NAME" == *"bp"* ]]; then
-                        NODE_TYPE="bp"
+                        if [[ "$NODE_TYPE" == "relay" ]]; then
+                            NODE_TYPE="hybrid"
+                        else
+                            NODE_TYPE="bp"
+                        fi
                     elif [[ "$TOPO_NAME" == *"relay"* ]]; then
-                        NODE_TYPE="relay"
+                        if [[ "$NODE_TYPE" == "bp" ]]; then
+                            NODE_TYPE="hybrid"
+                        else
+                            NODE_TYPE="relay"
+                        fi
                     fi
                 fi
                 if [[ "$TOPO_NAME" == *"relay"* ]]; then
