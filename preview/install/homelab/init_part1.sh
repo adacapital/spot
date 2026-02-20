@@ -3,7 +3,15 @@ set -euo pipefail
 
 # -------------------- globals --------------------
 NOW="$(date +"%Y%m%d_%H%M%S")"
-TOPO_FILE="$HOME/pool_topology"
+if [[ -n "${TOPO_FILE:-}" ]]; then
+  : # explicit override
+elif [[ -f "$HOME/pool_topology" ]]; then
+  TOPO_FILE="$HOME/pool_topology"
+elif [[ -f "/data/pool_topology" ]]; then
+  TOPO_FILE="/data/pool_topology"
+else
+  TOPO_FILE="$HOME/pool_topology"  # will fail later with a clear error
+fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 PARENT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
@@ -398,8 +406,10 @@ if [[ "$NODE_TYPE" == "bp" || "$NODE_TYPE" == "hybrid" ]]; then
   echo
   echo '---------------- Installing binaries to ~/.local/bin ----------------'
   mkdir -p "$HOME/.local/bin"
-  NODE_BIN="$(cabal exec -- which cardano-node 2>/dev/null || true)"
-  CLI_BIN="$(cabal exec -- which cardano-cli 2>/dev/null || true)"
+  NODE_BIN="$(cabal list-bin cardano-node 2>/dev/null)"
+  CLI_BIN="$(cabal list-bin cardano-cli 2>/dev/null)"
+  [[ -n "$NODE_BIN" && -f "$NODE_BIN" ]] || { echo "ERROR: could not locate cardano-node binary"; exit 1; }
+  [[ -n "$CLI_BIN"  && -f "$CLI_BIN"  ]] || { echo "ERROR: could not locate cardano-cli binary"; exit 1; }
   cp -p "$NODE_BIN" "$HOME/.local/bin/cardano-node"
   cp -p "$CLI_BIN"  "$HOME/.local/bin/cardano-cli"
 

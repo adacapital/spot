@@ -1,113 +1,165 @@
-#!/bin/bash
-# In a real life scenario (MAINNET), you need to have your keys under cold storage.
-# We're ok here as we're only playing with TESTNET.
+#!/usr/bin/env bash
+set -euo pipefail
 
-# global variables
-NOW=`date +"%Y%m%d_%H%M%S"`
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+# =========================
+# Locate & source utils.sh early
+# =========================
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
-PARENT1="$(realpath "$(dirname "$SPOT_DIR")")"
-ROOT_PATH="$(realpath "$(dirname "$PARENT1")")/preview"
-NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=$ROOT_PATH/pool_topology
+NS_PATH="${SPOT_DIR}/scripts"
 
+# shellcheck source=/dev/null
+source "${NS_PATH}/utils.sh"
 
-echo "UPDATE POOL REGISTRATION STARTING..."
-echo "SCRIPT_DIR: $SCRIPT_DIR"
-echo "SPOT_DIR: $SPOT_DIR"
-echo "ROOT_PATH: $ROOT_PATH"
-echo "NS_PATH: $NS_PATH"
-echo "TOPO_FILE: $TOPO_FILE"
+# =========================
+# Config — derive paths from CARDANO_NODE_SOCKET_PATH
+# =========================
+NODE_DIR="$(derive_node_path_from_socket)"
+ROOT_PATH="$(dirname "$NODE_DIR")"
+SOCKET_PATH="${CARDANO_NODE_SOCKET_PATH}"
 
-# importing utility functions
-source $NS_PATH/utils.sh
+POOL_KEYS_DIR="${ROOT_PATH}/pool_keys"
+COLD_SKEY_FILE="${POOL_KEYS_DIR}/cold.skey"
+COLD_COUNTER_FILE="${POOL_KEYS_DIR}/cold.counter"
+KES_VKEY_FILE="${POOL_KEYS_DIR}/kes.vkey"
+KES_SKEY_FILE="${POOL_KEYS_DIR}/kes.skey"
+NODE_CERT_FILE="${POOL_KEYS_DIR}/node.cert"
 
+SGENESIS="${NODE_DIR}/config/sgenesis.json"
+
+BP_SERVICE="run.bp.service"
+
+# =========================
+# Helpers
+# =========================
+cli() {
+  if cardano-cli latest --help >/dev/null 2>&1; then
+    cardano-cli latest "$@"
+  else
+    cardano-cli "$@"
+  fi
+}
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+confirm() {
+  local msg="$1"
+  if [[ "${ASSUME_YES:-0}" == "1" ]]; then return 0; fi
+  read -r -p "${msg} [y/N] " ans
+  [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]]
+}
+
+# =========================
+# Arg parsing
+# =========================
+ASSUME_YES=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --yes|-y) ASSUME_YES=1; shift;;
+    -h|--help)
+      echo "Usage: $0 [--yes]"
+      echo "Rotates KES keys, issues new operational certificate, and restarts the BP service."
+      exit 0;;
+    *) die "Unknown arg: $1 (use --help)";;
+  esac
+done
+
+# =========================
+# Sanity checks
+# =========================
+echo "=== ROTATE KES KEYS ==="
+echo "NODE_DIR:      $NODE_DIR"
+echo "ROOT_PATH:     $ROOT_PATH"
+echo "POOL_KEYS_DIR: $POOL_KEYS_DIR"
+echo "BP_SERVICE:    $BP_SERVICE"
 echo
-echo '---------------- Reading pool topology file and preparing a few things... ----------------'
 
-read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
-RELAYS=($RELAYS)
-cnt=${#RELAYS[@]}
-let cnt1="$cnt/3"
-let cnt2="$cnt1 + $cnt1"
-let cnt3="$cnt2 + $cnt1"
+[[ -S "$SOCKET_PATH" ]]    || die "Socket not found: $SOCKET_PATH (is the BP node running?)"
+[[ -f "$COLD_SKEY_FILE" ]] || die "Missing: $COLD_SKEY_FILE"
+[[ -f "$COLD_COUNTER_FILE" ]] || die "Missing: $COLD_COUNTER_FILE"
+[[ -f "$SGENESIS" ]]       || die "Missing: $SGENESIS"
 
-RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
-RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
-
-if [[ $ERROR == "none" ]]; then
-    if [[ $NODE_TYPE == "" ]]; then
-        echo "Node type not identified, something went wrong."
-        echo "Please fix the underlying issue and run init.sh again."
-        exit 1
-    else
-        echo "NODE_TYPE: $NODE_TYPE"
-        echo "RELAY_IPS: ${RELAY_IPS[@]}"
-        echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
-            echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
-    fi
-else
-    echo "ERROR: $ERROR"
-    exit 1
-fi
-
-NODE_PATH="$ROOT_PATH/node.bp"
-MAGIC=$(get_network_magic)
-echo "NODE_PATH: $NODE_PATH"
+MAGIC="$(get_network_magic)"
 echo "NETWORK_MAGIC: $MAGIC"
 
-cd $ROOT_PATH
-cd pool_keys
+# =========================
+# Compute current KES period
+# =========================
+SLOTS_PER_KES_PERIOD="$(jq -r '.slotsPerKESPeriod' "$SGENESIS")"
+CTIP="$(cli query tip --testnet-magic "$MAGIC" --socket-path "$SOCKET_PATH" | jq -r .slot)"
+KES_PERIOD=$((CTIP / SLOTS_PER_KES_PERIOD))
 
-if [ -f "$ROOT_PATH/pool_keys/kes.skey" ]; then
-    echo
-    echo '---------------- Backing up previous KES key pair ----------------'
-    chmod 664 $ROOT_PATH/pool_keys/kes.vkey
-    chmod 664 $ROOT_PATH/pool_keys/kes.skey
-    mv $ROOT_PATH/pool_keys/kes.vkey $ROOT_PATH/pool_keys/kes.vkey.$NOW
-    mv $ROOT_PATH/pool_keys/kes.skey $ROOT_PATH/pool_keys/kes.skey.$NOW
-    chmod 400 $ROOT_PATH/pool_keys/kes.vkey.$NOW
-    chmod 400 $ROOT_PATH/pool_keys/kes.skey.$NOW
+echo "SLOTS_PER_KES_PERIOD: $SLOTS_PER_KES_PERIOD"
+echo "Current slot:         $CTIP"
+echo "KES_PERIOD:           $KES_PERIOD"
+echo
+
+confirm "Proceed to rotate KES keys and issue new operational certificate?" || die "Aborted"
+
+# =========================
+# Backup existing keys
+# =========================
+NOW="$(date +"%Y%m%d_%H%M%S")"
+
+if [[ -f "$KES_SKEY_FILE" ]]; then
+  echo "Backing up kes.skey -> kes.skey.${NOW}"
+  chmod 644 "$KES_SKEY_FILE" || true
+  mv "$KES_SKEY_FILE" "${KES_SKEY_FILE}.${NOW}"
+  chmod 400 "${KES_SKEY_FILE}.${NOW}"
 fi
 
-
-if [ -f "$ROOT_PATH/pool_keys/node.cert" ]; then
-    echo
-    echo '---------------- Backing up previous operational certificate ----------------'
-    chmod 664 $ROOT_PATH/pool_keys/node.cert
-    mv $ROOT_PATH/pool_keys/node.cert $ROOT_PATH/pool_keys/node.cert.$NOW
-    chmod 400 $ROOT_PATH/pool_keys/node.cert.$NOW
+if [[ -f "$KES_VKEY_FILE" ]]; then
+  echo "Backing up kes.vkey -> kes.vkey.${NOW}"
+  chmod 644 "$KES_VKEY_FILE" || true
+  mv "$KES_VKEY_FILE" "${KES_VKEY_FILE}.${NOW}"
+  chmod 400 "${KES_VKEY_FILE}.${NOW}"
 fi
 
+if [[ -f "$NODE_CERT_FILE" ]]; then
+  echo "Backing up node.cert -> node.cert.${NOW}"
+  chmod 644 "$NODE_CERT_FILE" || true
+  mv "$NODE_CERT_FILE" "${NODE_CERT_FILE}.${NOW}"
+  chmod 400 "${NODE_CERT_FILE}.${NOW}"
+fi
+echo
+
+# =========================
+# Generate new KES key pair
+# =========================
+echo "Generating new KES key pair..."
+cli node key-gen-KES \
+  --verification-key-file "$KES_VKEY_FILE" \
+  --signing-key-file "$KES_SKEY_FILE"
+
+chmod 400 "$KES_SKEY_FILE"
+echo "  $KES_VKEY_FILE"
+echo "  $KES_SKEY_FILE"
+echo
+
+# =========================
+# Issue new operational certificate
+# =========================
+echo "Issuing new operational certificate (KES period: $KES_PERIOD)..."
+cli node issue-op-cert \
+  --kes-verification-key-file "$KES_VKEY_FILE" \
+  --cold-signing-key-file "$COLD_SKEY_FILE" \
+  --operational-certificate-issue-counter "$COLD_COUNTER_FILE" \
+  --kes-period "$KES_PERIOD" \
+  --out-file "$NODE_CERT_FILE"
+
+chmod 400 "$NODE_CERT_FILE"
+echo "  $NODE_CERT_FILE"
+echo
+
+# =========================
+# Restart BP service
+# =========================
+confirm "Restart ${BP_SERVICE} now?" || die "Aborted before restart"
+
+echo "Restarting ${BP_SERVICE}..."
+sudo systemctl restart "$BP_SERVICE"
 
 echo
-echo '---------------- Generating KES key pair ----------------'
-
-cardano-cli node key-gen-KES \
---verification-key-file kes.vkey \
---signing-key-file kes.skey
-
-chmod 400 kes.skey
-
-echo
-echo '---------------- Generating the operational certificate ----------------'
-
-SLOTSPERKESPERIOD=$(cat $ROOT_PATH/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-CTIP=$(cardano-cli query tip --socket-path $ROOT_PATH/node.bp/socket/node.socket --testnet-magic $MAGIC | jq -r .slot)
-KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
-echo "SLOTSPERKESPERIOD: $SLOTSPERKESPERIOD"
-echo "CTIP: $CTIP"
-echo "KES_PERIOD: $KES_PERIOD"
-
-cardano-cli node issue-op-cert \
---kes-verification-key-file kes.vkey \
---cold-signing-key-file cold.skey \
---operational-certificate-issue-counter cold.counter \
---kes-period $KES_PERIOD \
---out-file node.cert
-
-echo
-echo '---------------- Restarting bp node ----------------'
-
-sudo systemctl restart run.bp-preview.service
+echo "Done. KES keys rotated and BP service restarted."
+echo "Verify with: sudo systemctl status $BP_SERVICE"

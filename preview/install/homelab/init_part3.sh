@@ -2,7 +2,15 @@
 set -euo pipefail
 
 NOW="$(date +"%Y%m%d_%H%M%S")"
-TOPO_FILE="${TOPO_FILE:-$HOME/pool_topology}"
+if [[ -n "${TOPO_FILE:-}" ]]; then
+  : # explicit override
+elif [[ -f "$HOME/pool_topology" ]]; then
+  TOPO_FILE="$HOME/pool_topology"
+elif [[ -f "/data/pool_topology" ]]; then
+  TOPO_FILE="/data/pool_topology"
+else
+  TOPO_FILE="$HOME/pool_topology"  # will fail later with a clear error
+fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 PARENT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
@@ -55,8 +63,12 @@ echo "RELAY_NAMES:   ${RELAY_NAMES[*]}"
 echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[*]}"
 
 # -------------------- configuration --------------------
-BP_NODE_DIR="$HOME/node.bp"
-RELAY_NODE_DIR="$HOME/node.relay"
+# Prompt for node base directory (where node.bp / node.relay live)
+NODE_BASE="${NODE_BASE:-$HOME}"
+NODE_BASE="$(prompt_input_default NODE_BASE "$NODE_BASE")"
+
+BP_NODE_DIR="$NODE_BASE/node.bp"
+RELAY_NODE_DIR="$NODE_BASE/node.relay"
 
 BP_SERVICE="run.bp"
 RELAY_SERVICE="run.relay"

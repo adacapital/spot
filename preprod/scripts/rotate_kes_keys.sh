@@ -1,213 +1,270 @@
-#!/bin/bash
-# Beware this script requires some parts to be run in an air-gapped environment.
-# Failure to do so will prevent the script from running.
+#!/usr/bin/env bash
+set -euo pipefail
 
-# global variables
-NOW=`date +"%Y%m%d_%H%M%S"`
-SCRIPT_DIR="$(realpath "$(dirname "$0")")"
+# =========================
+# KES Key Rotation — Airgap version (2-phase)
+#
+# Phase 1: Run on BP node (online)
+#   - Generates new KES keypair
+#   - Computes current KES period
+#   - Saves state for airgap phase
+#   - Tells user which files to move to airgap machine
+#
+# Phase 2: Run on airgap machine (offline)
+#   - Signs operational certificate with cold keys
+#   - Copies node.cert to USB key
+#   - Generates apply_state.sh for the BP node
+#
+# Phase 3: On BP node, run apply_state.sh from USB
+#   - Installs node.cert and restarts BP service
+# =========================
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPOT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
-NS_PATH="$SPOT_DIR/scripts"
-TOPO_FILE=~/pool_topology
+NS_PATH="${SPOT_DIR}/scripts"
 
-# importing utility functions
-source $NS_PATH/utils.sh
-MAGIC=$(get_network_magic)
-echo "NETWORK_MAGIC: $MAGIC"
+# shellcheck source=/dev/null
+source "${NS_PATH}/utils.sh"
 
-echo
-echo '---------------- Reading pool topology file and preparing a few things... ----------------'
-
-read ERROR NODE_TYPE BP_IP RELAYS < <(get_topo $TOPO_FILE)
-RELAYS=($RELAYS)
-cnt=${#RELAYS[@]}
-let cnt1="$cnt/3"
-let cnt2="$cnt1 + $cnt1"
-let cnt3="$cnt2 + $cnt1"
-
-RELAY_IPS=( "${RELAYS[@]:0:$cnt1}" )
-RELAY_NAMES=( "${RELAYS[@]:$cnt1:$cnt1}" )
-RELAY_IPS_PUB=( "${RELAYS[@]:$cnt2:$cnt1}" )
-
-if [[ $ERROR == "none" ]]; then
-    echo "NODE_TYPE: $NODE_TYPE"
-    echo "RELAY_IPS: ${RELAY_IPS[@]}"
-    echo "RELAY_NAMES: ${RELAY_NAMES[@]}"
-    echo "RELAY_IPS_PUB: ${RELAY_IPS_PUB[@]}"
-else
-    echo "ERROR: $ERROR"
-    exit 1
-fi
-
-IS_AIR_GAPPED=0
-if [[ $NODE_TYPE == "airgap" ]]; then
-    # checking we're in an air-gapped environment
-    if ping -q -c 1 -W 1 google.com >/dev/null; then
-        echo "The network is up"
-    else
-        echo "The network is down"
-    fi
-
-    IS_AIR_GAPPED=$(check_air_gap)
-
-    if [[ $IS_AIR_GAPPED == 1 ]]; then
-        echo "we are air-gapped"
-    else
-        echo "we are online"
-    fi
-fi
-
-# getting the script state ready
+NOW="$(date +"%Y%m%d_%H%M%S")"
 STATE_FILE="$HOME/spot.state"
 
-if [ -f "$STATE_FILE" ]; then
-    # Source the state file to restore state
-    . "$STATE_FILE" 2>/dev/null || :
+# =========================
+# Helpers
+# =========================
+cli() {
+  if cardano-cli latest --help >/dev/null 2>&1; then
+    cardano-cli latest "$@"
+  else
+    cardano-cli "$@"
+  fi
+}
 
-    if [[ $STATE_STEP_ID == 1 && $STATE_SUB_STEP_ID != "completed.trans" ]]; then
-        echo
-        print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE $STATE_TRANS_WORK_DIR
-        echo
-        echo "State file is not as expected. Make sure to complete successfuly the init_stake step first."
-        echo "Bye for now."
-        exit 1
-    elif [[ $STATE_STEP_ID == 2 && $STATE_SUB_STEP_ID == "cold.keys" ]]; then
-        if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
-            echo "Warning, to proceed further your environment must be air-gapped."
-            echo "Bye for now!"
-            exit 1
-        fi
-    elif [[ $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_opcert_gen" ]]; then
-        if [[ $NODE_TYPE != "airgap" || $IS_AIR_GAPPED == 0 ]]; then
-            echo "Warning, to proceed further your environment must be air-gapped."
-            echo "Bye for now!"
-            exit 1
-        fi
-    else
-        STATE_STEP_ID=4
-        STATE_SUB_STEP_ID="rotate_kes_keys_init"
-        STATE_LAST_DATE="never"
-        STATE_TRANS_WORK_DIR=""
-    fi
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+confirm() {
+  local msg="$1"
+  read -r -p "${msg} [y/N] " ans
+  [[ "${ans,,}" == "y" || "${ans,,}" == "yes" ]]
+}
+
+# =========================
+# Detect environment
+# =========================
+if [[ -n "${CARDANO_NODE_SOCKET_PATH:-}" ]] && [[ -S "${CARDANO_NODE_SOCKET_PATH}" ]]; then
+  PHASE="bp"
+elif ! ping -q -c 1 -W 1 google.com >/dev/null 2>&1; then
+  PHASE="airgap"
 else
-    touch $STATE_FILE
-    STATE_STEP_ID=4
-    STATE_SUB_STEP_ID="rotate_kes_keys_init"
-    STATE_LAST_DATE="never"
-    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE
+  die "Cannot determine environment: no socket (not BP) but network is up (not airgap)."
 fi
 
-print_state $STATE_STEP_ID $STATE_SUB_STEP_ID $STATE_LAST_DATE
-
-if [[ $NODE_TYPE == "bp" && $IS_AIR_GAPPED == 0 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_init" ]]; then
-    cd $HOME
-    mkdir -p pool_keys
-    cd pool_keys
-
-    if [ -f "$HOME/pool_keys/kes.skey" ]; then
-        echo
-        echo '---------------- Backing up previous KES key pair ----------------'
-        chmod 664 $HOME/pool_keys/kes.skey
-        mv $HOME/pool_keys/kes.skey $HOME/pool_keys/kes.skey.$NOW
-        chmod 400 $HOME/pool_keys/kes.skey.$NOW
-    fi
-
-    if [ -f "$HOME/pool_keys/node.cert" ]; then
-        echo
-        echo '---------------- Backing up previous operational certificate ----------------'
-        chmod 664 $HOME/pool_keys/node.cert
-        mv $HOME/pool_keys/node.cert $HOME/pool_keys/node.cert.$NOW
-        chmod 400 $HOME/pool_keys/node.cert.$NOW
-    fi
-
-    echo
-    echo '---------------- Generating KES key pair ----------------'
-
-    cardano-cli node key-gen-KES \
-    --verification-key-file kes.vkey \
-    --signing-key-file kes.skey
-
-    chmod 400 kes.skey
-
-    echo
-    echo '---------------- Gathering some information to generate the operational certificate ----------------'
-
-    SLOTSPERKESPERIOD=$(cat $HOME/node.bp/config/sgenesis.json | jq -r '.slotsPerKESPeriod')
-    CTIP=$(cardano-cli query tip --testnet-magic $MAGIC | jq -r .slot)
-    KES_PERIOD=$(expr $CTIP / $SLOTSPERKESPERIOD)
-    STATE_SUB_STEP_ID="rotate_kes_keys_opcert_gen"
-    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE SLOTSPERKESPERIOD CTIP KES_PERIOD
-
-    echo "SLOTSPERKESPERIOD: $SLOTSPERKESPERIOD"
-    echo "CTIP: $CTIP"
-    echo "KES_PERIOD: $KES_PERIOD"
-
-    # copy certain files back to the air-gapped environment to continue operation there
-    STATE_APPLY_SCRIPT=$HOME/apply_state.sh
-    echo
-    echo "Please move the following files back to your air-gapped environment in your home directory and run apply_state.sh."
-    echo $STATE_FILE
-    echo $HOME/pool_keys/kes.vkey
-    echo $STATE_APPLY_SCRIPT
-
-    echo "#!/bin/bash
+echo "=== ROTATE KES KEYS (airgap workflow) ==="
+echo "PHASE: $PHASE"
 echo
-echo '---------------- Backing up previous KES key pair ----------------'
-chmod 664 \$HOME/pool_keys/kes.vkey
-mv \$HOME/pool_keys/kes.vkey \$HOME/pool_keys/kes.vkey.$NOW
-chmod 400 \$HOME/pool_keys/kes.vkey.$NOW
-echo '---------------- Backing up previous operational certificate ----------------'
-chmod 664 \$HOME/pool_keys/node.cert
-mv \$HOME/pool_keys/node.cert \$HOME/pool_keys/node.cert.$NOW
-chmod 400 \$HOME/pool_keys/node.cert.$NOW
-mv kes.vkey \$HOME/pool_keys
-chmod 400 \$HOME/pool_keys/kes.vkey
-echo \"state applied, please now run rotate_kes_keys.sh\"" > $STATE_APPLY_SCRIPT
+
+# =============================================================================
+# PHASE 1 — BP node (online): generate KES keys, compute KES period, save state
+# =============================================================================
+if [[ "$PHASE" == "bp" ]]; then
+  NODE_DIR="$(derive_node_path_from_socket)"
+  ROOT_PATH="$(dirname "$NODE_DIR")"
+  SOCKET_PATH="${CARDANO_NODE_SOCKET_PATH}"
+  POOL_KEYS_DIR="${ROOT_PATH}/pool_keys"
+  SGENESIS="${NODE_DIR}/config/sgenesis.json"
+
+  KES_VKEY_FILE="${POOL_KEYS_DIR}/kes.vkey"
+  KES_SKEY_FILE="${POOL_KEYS_DIR}/kes.skey"
+
+  echo "NODE_DIR:      $NODE_DIR"
+  echo "ROOT_PATH:     $ROOT_PATH"
+  echo "POOL_KEYS_DIR: $POOL_KEYS_DIR"
+  echo
+
+  [[ -f "$SGENESIS" ]] || die "Missing: $SGENESIS"
+
+  MAGIC="$(get_network_magic)"
+  echo "NETWORK_MAGIC: $MAGIC"
+
+  # Compute KES period
+  SLOTS_PER_KES_PERIOD="$(jq -r '.slotsPerKESPeriod' "$SGENESIS")"
+  CTIP="$(cli query tip --testnet-magic "$MAGIC" --socket-path "$SOCKET_PATH" | jq -r .slot)"
+  KES_PERIOD=$((CTIP / SLOTS_PER_KES_PERIOD))
+
+  echo "SLOTS_PER_KES_PERIOD: $SLOTS_PER_KES_PERIOD"
+  echo "Current slot:         $CTIP"
+  echo "KES_PERIOD:           $KES_PERIOD"
+  echo
+
+  confirm "Proceed to generate new KES keypair?" || die "Aborted"
+
+  # Backup existing KES keys
+  if [[ -f "$KES_SKEY_FILE" ]]; then
+    echo "Backing up kes.skey -> kes.skey.${NOW}"
+    chmod 644 "$KES_SKEY_FILE" || true
+    mv "$KES_SKEY_FILE" "${KES_SKEY_FILE}.${NOW}"
+    chmod 400 "${KES_SKEY_FILE}.${NOW}"
+  fi
+
+  if [[ -f "$KES_VKEY_FILE" ]]; then
+    echo "Backing up kes.vkey -> kes.vkey.${NOW}"
+    chmod 644 "$KES_VKEY_FILE" || true
+    mv "$KES_VKEY_FILE" "${KES_VKEY_FILE}.${NOW}"
+    chmod 400 "${KES_VKEY_FILE}.${NOW}"
+  fi
+
+  # Generate new KES keypair
+  echo "Generating new KES key pair..."
+  cli node key-gen-KES \
+    --verification-key-file "$KES_VKEY_FILE" \
+    --signing-key-file "$KES_SKEY_FILE"
+
+  chmod 400 "$KES_SKEY_FILE"
+  echo "  $KES_VKEY_FILE"
+  echo "  $KES_SKEY_FILE"
+  echo
+
+  # Save state for airgap phase
+  STATE_STEP_ID=4
+  STATE_SUB_STEP_ID="rotate_kes_keys_opcert_gen"
+  STATE_LAST_DATE="$NOW"
+  save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE SLOTS_PER_KES_PERIOD CTIP KES_PERIOD
+
+  echo "State saved to: $STATE_FILE"
+  echo
+  echo "============================================"
+  echo "Phase 1 complete. Now move these files to"
+  echo "your airgap machine's home directory:"
+  echo "  1. $STATE_FILE"
+  echo "  2. $KES_VKEY_FILE"
+  echo "Then run this same script on the airgap machine."
+  echo "============================================"
+
+# =============================================================================
+# PHASE 2 — Airgap machine: sign op cert with cold keys
+# =============================================================================
+elif [[ "$PHASE" == "airgap" ]]; then
+  POOL_KEYS_DIR="$HOME/pool_keys"
+  COLD_KEYS_DIR="$HOME/cold_keys"
+  COLD_SKEY_FILE="${COLD_KEYS_DIR}/cold.skey"
+  COLD_COUNTER_FILE="${COLD_KEYS_DIR}/cold.counter"
+  KES_VKEY_FILE="${POOL_KEYS_DIR}/kes.vkey"
+  NODE_CERT_FILE="${POOL_KEYS_DIR}/node.cert"
+
+  echo "POOL_KEYS_DIR: $POOL_KEYS_DIR"
+  echo "COLD_KEYS_DIR: $COLD_KEYS_DIR"
+  echo
+
+  # Load state from BP phase
+  [[ -f "$STATE_FILE" ]] || die "State file not found: $STATE_FILE (did you copy it from the BP node?)"
+  # shellcheck source=/dev/null
+  . "$STATE_FILE" 2>/dev/null || die "Failed to source state file: $STATE_FILE"
+
+  [[ "${STATE_SUB_STEP_ID:-}" == "rotate_kes_keys_opcert_gen" ]] || \
+    die "Unexpected state: ${STATE_SUB_STEP_ID:-empty}. Expected: rotate_kes_keys_opcert_gen"
+
+  echo "KES_PERIOD (from state): $KES_PERIOD"
+  echo
+
+  # Sanity checks
+  [[ -f "$COLD_SKEY_FILE" ]]   || die "Missing: $COLD_SKEY_FILE"
+  [[ -f "$COLD_COUNTER_FILE" ]] || die "Missing: $COLD_COUNTER_FILE"
+  [[ -f "$KES_VKEY_FILE" ]]    || die "Missing: $KES_VKEY_FILE (did you copy it from the BP node?)"
+
+  # Backup existing node.cert
+  if [[ -f "$NODE_CERT_FILE" ]]; then
+    echo "Backing up node.cert -> node.cert.${NOW}"
+    chmod 644 "$NODE_CERT_FILE" || true
+    mv "$NODE_CERT_FILE" "${NODE_CERT_FILE}.${NOW}"
+    chmod 400 "${NODE_CERT_FILE}.${NOW}"
+  fi
+
+  confirm "Issue operational certificate with KES period $KES_PERIOD?" || die "Aborted"
+
+  # Issue operational certificate
+  echo "Issuing operational certificate..."
+  cli node issue-op-cert \
+    --kes-verification-key-file "$KES_VKEY_FILE" \
+    --cold-signing-key-file "$COLD_SKEY_FILE" \
+    --operational-certificate-issue-counter "$COLD_COUNTER_FILE" \
+    --kes-period "$KES_PERIOD" \
+    --out-file "$NODE_CERT_FILE"
+
+  chmod 400 "$NODE_CERT_FILE"
+  echo "  $NODE_CERT_FILE"
+  echo
+
+  # Update state
+  STATE_SUB_STEP_ID="rotate_kes_keys_opcert_install"
+  STATE_LAST_DATE="$NOW"
+  save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE
+
+  # Copy to USB key
+  if [[ -z "${SPOT_USB_KEY:-}" ]]; then
+    read -r -p "Enter path to USB key directory: " SPOT_USB_KEY
+    # Persist for future use
+    if ! grep -q 'SPOT_USB_KEY' ~/.bashrc 2>/dev/null; then
+      echo "export SPOT_USB_KEY=\"$SPOT_USB_KEY\"" >> ~/.bashrc
+    fi
+  fi
+
+  [[ -d "$SPOT_USB_KEY" ]] || die "USB key directory not found: $SPOT_USB_KEY"
+
+  cp "$STATE_FILE" "$SPOT_USB_KEY/"
+  cp "$NODE_CERT_FILE" "$SPOT_USB_KEY/"
+
+  # Generate apply_state.sh for the BP node
+  cat > "${SPOT_USB_KEY}/apply_state.sh" <<'APPLY_EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NODE_CERT_SRC="${SCRIPT_DIR}/node.cert"
+
+# Derive pool_keys dir from CARDANO_NODE_SOCKET_PATH
+if [[ -z "${CARDANO_NODE_SOCKET_PATH:-}" ]]; then
+  echo "ERROR: CARDANO_NODE_SOCKET_PATH is not set" >&2
+  exit 1
+fi
+SOCKET_PATH="$(realpath "$CARDANO_NODE_SOCKET_PATH")"
+NODE_DIR="$(dirname "$(dirname "$SOCKET_PATH")")"
+ROOT_PATH="$(dirname "$NODE_DIR")"
+POOL_KEYS_DIR="${ROOT_PATH}/pool_keys"
+NODE_CERT_DST="${POOL_KEYS_DIR}/node.cert"
+
+[[ -f "$NODE_CERT_SRC" ]] || { echo "ERROR: node.cert not found next to this script" >&2; exit 1; }
+
+echo "Installing node.cert..."
+echo "  From: $NODE_CERT_SRC"
+echo "  To:   $NODE_CERT_DST"
+
+NOW="$(date +"%Y%m%d_%H%M%S")"
+if [[ -f "$NODE_CERT_DST" ]]; then
+  chmod 644 "$NODE_CERT_DST" || true
+  mv "$NODE_CERT_DST" "${NODE_CERT_DST}.${NOW}"
+  chmod 400 "${NODE_CERT_DST}.${NOW}"
 fi
 
-if [[ $NODE_TYPE == "airgap" && $IS_AIR_GAPPED == 1 && $STATE_STEP_ID == 4 && $STATE_SUB_STEP_ID == "rotate_kes_keys_opcert_gen" ]]; then
-    cd $HOME
-    mkdir -p pool_keys
-    cd pool_keys
+cp "$NODE_CERT_SRC" "$NODE_CERT_DST"
+chmod 400 "$NODE_CERT_DST"
 
-    echo
-    echo '---------------- Generating the operational certificate ----------------'
+echo "Restarting BP service..."
+sudo systemctl restart run.bp.service
 
-    cardano-cli node issue-op-cert \
-    --kes-verification-key-file $HOME/pool_keys/kes.vkey \
-    --cold-signing-key-file $HOME/cold_keys/cold.skey \
-    --operational-certificate-issue-counter $HOME/cold_keys/cold.counter \
-    --kes-period $KES_PERIOD \
-    --out-file node.cert
-
-    STATE_SUB_STEP_ID="rotate_kes_keys_opcert_install"
-    STATE_LAST_DATE=`date +"%Y%m%d_%H%M%S"`
-    save_state STATE_STEP_ID STATE_SUB_STEP_ID STATE_LAST_DATE
-
-    # make sure path to usb key is set as a global variable and add it to .bashrc
-    if [[ -z "$SPOT_USB_KEY" ]]; then
-        read -p "Enter path to usb key directory to be used to move data between offline and online environments: " SPOT_USB_KEY
-    
-        # add it to .bashrc
-        echo $"if [[ -z \$SPOT_USB_KEY ]]; then
-    export SPOT_USB_KEY=$SPOT_USB_KEY
-fi" >> ~/.bashrc
-        eval "$(cat ~/.bashrc | tail -n +10)"
-        echo "\$SPOT_USB_KEY After: $SPOT_USB_KEY"
-    fi
-
-    # copy certain files to usb key to continue operations on bp node
-    cp $STATE_FILE $SPOT_USB_KEY
-    cp $HOME/pool_keys/node.cert $SPOT_USB_KEY
-    STATE_APPLY_SCRIPT=$SPOT_USB_KEY/apply_state.sh
-    echo "#!/bin/bash
-mkdir -p \$HOME/pool_keys
-mv node.cert \$HOME/pool_keys
-chmod 400 \$HOME/pool_keys/node.cert
 echo
-echo '---------------- Restarting bp node ----------------'
-sudo systemctl restart run.bp
-echo \"New KES keys installed and bp node restarted. Until next time...\"" > $STATE_APPLY_SCRIPT
+echo "Done. KES rotation complete."
+echo "Verify with: sudo systemctl status run.bp.service"
+APPLY_EOF
 
-    echo
-    echo "Now copy all files in $SPOT_USB_KEY to your bp node home folder and run apply_state.sh."
+  chmod +x "${SPOT_USB_KEY}/apply_state.sh"
+
+  echo "============================================"
+  echo "Phase 2 complete. Files on USB key:"
+  echo "  ${SPOT_USB_KEY}/node.cert"
+  echo "  ${SPOT_USB_KEY}/apply_state.sh"
+  echo "  ${SPOT_USB_KEY}/spot.state"
+  echo
+  echo "Now move the USB to the BP node and run:"
+  echo "  bash /path/to/usb/apply_state.sh"
+  echo "============================================"
 fi

@@ -1,5 +1,27 @@
 #!/bin/bash
 
+derive_node_path_from_socket () {
+    if [[ -z "${CARDANO_NODE_SOCKET_PATH:-}" ]]; then
+        echo "derive_node_path_from_socket(): CARDANO_NODE_SOCKET_PATH is not set" >&2
+        return 1
+    fi
+
+    local socket_path
+    socket_path="$(realpath "$CARDANO_NODE_SOCKET_PATH")"
+
+    # Expect: <node_path>/socket/node.socket
+    local node_path
+    node_path="$(dirname "$(dirname "$socket_path")")"
+
+    if [[ ! -d "$node_path" ]]; then
+        echo "derive_node_path_from_socket(): derived NODE_PATH does not exist: $node_path" >&2
+        return 1
+    fi
+
+    echo "$node_path"
+}
+
+
 # prompt yes no
 promptyn () {
     while true; do
@@ -44,9 +66,11 @@ get_topo () {
     MY_IP=$(hostname -I | xargs)
     NODE_TYPE="unknown"
     BP_IP=""
+    BP_PORT=""
     RELAY_IPS=()
     RELAY_NAMES=()
     RELAY_IPS_PUB=()
+    RELAY_PORTS=()
     ERROR="none"
     # echo "MY_IP: ${MY_IP}"
 
@@ -64,13 +88,16 @@ get_topo () {
         while IFS= read -r TOPO; do
             # echo $TOPO
             if [[ ! -z $TOPO ]] && [[ "$TOPO" != \#* ]]; then
-                TOPO_IP=$(awk '{ print $1 }' <<< "${TOPO}")
+                TOPO_IP_PORT=$(awk '{ print $1 }' <<< "${TOPO}")
                 TOPO_NAME=$(awk '{ print $2 }' <<< "${TOPO}")
                 TOPO_IP_PUB=$(awk '{ print $3 }' <<< "${TOPO}")
-                #echo "TOPO_IP: ${TOPO_IP}"
-                #echo "TOPO_NAME: ${TOPO_NAME}"
+                # Split IP:PORT (port is optional)
+                TOPO_IP="${TOPO_IP_PORT%%:*}"
+                TOPO_PORT="${TOPO_IP_PORT##*:}"
+                [[ "$TOPO_PORT" == "$TOPO_IP" ]] && TOPO_PORT=""
                 if [[ $TOPO_NAME == "bp" ]]; then
                     BP_IP=$TOPO_IP
+                    BP_PORT="${TOPO_PORT:-3000}"
                 fi
 
                 if [[ $TOPO_IP == $MY_IP ]]; then
@@ -92,6 +119,7 @@ get_topo () {
                     RELAY_IPS+=($TOPO_IP)
                     RELAY_NAMES+=($TOPO_NAME)
                     RELAY_IPS_PUB+=($TOPO_IP_PUB)
+                    RELAY_PORTS+=("${TOPO_PORT:-3001}")
                 fi
             fi
         done <$TOPO_FILE
@@ -103,19 +131,19 @@ get_topo () {
         ERROR="$TOPO_FILE does not exist. Please create it as per instructions and run this script again."
     fi
 
-    echo "$ERROR $NODE_TYPE $BP_IP ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]}"
+    echo "$ERROR $NODE_TYPE $BP_IP $BP_PORT ${RELAY_IPS[@]} ${RELAY_NAMES[@]} ${RELAY_IPS_PUB[@]} ${RELAY_PORTS[@]}"
 }
 
-# spot topology utils
 get_network_magic () {
-    CONF=$NODE_PATH/config/bgenesis.json
-    if [ ! -f "$CONF" ]; then
-        CONF=$NODE_PATH/config/bgenesis.json
-        if [ ! -f "$CONF" ]; then
-            echo "get_network_magic(): byron genesis file not found, bye for now!"
-            exit
-        fi
+    local node_path
+    node_path="$(derive_node_path_from_socket)" || return 1
+
+    local conf="${node_path}/config/bgenesis.json"
+
+    if [[ ! -f "$conf" ]]; then
+        echo "get_network_magic(): byron genesis not found at $conf" >&2
+        return 1
     fi
-    MAGIC=`cat $CONF | jq -r .protocolConsts.protocolMagic`
-    echo "$MAGIC"
+
+    jq -r '.protocolConsts.protocolMagic' "$conf"
 }

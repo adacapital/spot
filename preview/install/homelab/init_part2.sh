@@ -7,8 +7,8 @@ set -euo pipefail
 #
 # What this script DOES:
 # - Reads pool_topology to determine NODE_TYPE (bp|relay|hybrid), BP_IP, relay list
-# - For hybrid: sets up BOTH ~/node.bp AND ~/node.relay on the same VM
-# - Creates node directory structure under ~/node.bp or ~/node.relay
+# - For hybrid: sets up BOTH node.bp AND node.relay on the same VM
+# - Creates node directory structure under $NODE_BASE/node.bp or $NODE_BASE/node.relay
 # - Downloads env config + genesis + book topology (+ peer-snapshot.json)
 # - Patches config.json minimally (genesis filenames + EKG/Prometheus + scribes)
 # - Patches book topology.json (useLedgerAfterSlot -> 0)
@@ -32,7 +32,15 @@ set -euo pipefail
 # ------------------------------------------------------------
 
 NOW="$(date +"%Y%m%d_%H%M%S")"
-TOPO_FILE="${TOPO_FILE:-$HOME/pool_topology}"
+if [[ -n "${TOPO_FILE:-}" ]]; then
+  : # explicit override
+elif [[ -f "$HOME/pool_topology" ]]; then
+  TOPO_FILE="$HOME/pool_topology"
+elif [[ -f "/data/pool_topology" ]]; then
+  TOPO_FILE="/data/pool_topology"
+else
+  TOPO_FILE="$HOME/pool_topology"  # will fail later with a clear error
+fi
 
 SCRIPT_DIR="$(realpath "$(dirname "$0")")"
 PARENT_DIR="$(realpath "$(dirname "$SCRIPT_DIR")")"
@@ -84,7 +92,7 @@ fetch() {
 
 ensure_dir_layout() {
   local node_dir="$1"
-  mkdir -p "$HOME/$node_dir"/{config,socket,logs,db}
+  mkdir -p "$NODE_BASE/$node_dir"/{config,socket,logs,db}
 }
 
 ensure_bashrc_block() {
@@ -107,14 +115,14 @@ ensure_bashrc_block() {
   cat >> "$tmp" <<EOF
 $marker_start
 export SPOT_PATH="$SPOT_DIR"
-export CARDANO_NODE_SOCKET_PATH="\$HOME/$node_dir/socket/node.socket"
+export CARDANO_NODE_SOCKET_PATH="$NODE_BASE/$node_dir/socket/node.socket"
 $marker_end
 EOF
 
   mv "$tmp" "$HOME/.bashrc"
 
   export SPOT_PATH="$SPOT_DIR"
-  export CARDANO_NODE_SOCKET_PATH="$HOME/$node_dir/socket/node.socket"
+  export CARDANO_NODE_SOCKET_PATH="$NODE_BASE/$node_dir/socket/node.socket"
 }
 
 discover_binaries() {
@@ -136,7 +144,7 @@ discover_binaries() {
 patch_config_minimal() {
   local node_dir="$1"
   local node_type="$2"
-  local cfg="$HOME/$node_dir/config/config.json"
+  local cfg="$NODE_BASE/$node_dir/config/config.json"
 
   [[ -f "$cfg" ]] || die "config.json not found at: $cfg (download step failed?)"
 
@@ -152,11 +160,11 @@ patch_config_minimal() {
   if [[ "$node_type" == "bp" ]]; then
     ekg_port=12789
     prometheus_port=12799
-    log_path="$HOME/node.bp/logs/node0.json"
+    log_path="$NODE_BASE/node.bp/logs/node0.json"
   else
     ekg_port=12788
     prometheus_port=12798
-    log_path="$HOME/node.relay/logs/node0.json"
+    log_path="$NODE_BASE/node.relay/logs/node0.json"
   fi
 
   local tmp
@@ -228,23 +236,31 @@ build_topology() {
   local bp_ip="$3"
   shift 3
 
-  # Args: relay_ips... --names relay_names...
+  # Args: relay_ips... --names relay_names... --ports relay_ports...
   local relay_ips=()
   local relay_names=()
-  local parsing_names=0
+  local relay_ports=()
+  local parsing="ips"
   for arg in "$@"; do
     if [[ "$arg" == "--names" ]]; then
-      parsing_names=1
+      parsing="names"
+      continue
+    elif [[ "$arg" == "--ports" ]]; then
+      parsing="ports"
       continue
     fi
-    if (( parsing_names == 0 )); then
-      relay_ips+=("$arg")
-    else
-      relay_names+=("$arg")
-    fi
+    case "$parsing" in
+      ips)   relay_ips+=("$arg") ;;
+      names) relay_names+=("$arg") ;;
+      ports) relay_ports+=("$arg") ;;
+    esac
   done
+  # Default ports if not provided
+  if (( ${#relay_ports[@]} == 0 )); then
+    for ((i=0; i<${#relay_ips[@]}; i++)); do relay_ports+=("3001"); done
+  fi
 
-  local cfg_dir="$HOME/$node_dir/config"
+  local cfg_dir="$NODE_BASE/$node_dir/config"
   local topo_main="$cfg_dir/topology.json"
   local topo_bp="$cfg_dir/topology_bp.json"
   local peer_snapshot="$cfg_dir/peer-snapshot.json"
@@ -254,7 +270,7 @@ build_topology() {
   build_access_points_array() {
     local -n _ips=$1
     local -n _names=$2
-    local _port=$3
+    local -n _ports=$3
     local n="${#_ips[@]}"
 
     if (( ${#_names[@]} != n )); then
@@ -264,7 +280,7 @@ build_topology() {
 
     (
       for ((i=0; i<n; i++)); do
-        jq -n --arg a "${_ips[$i]}" --arg n "${_names[$i]}" --argjson p "$_port" \
+        jq -n --arg a "${_ips[$i]}" --arg n "${_names[$i]}" --argjson p "${_ports[$i]}" \
           '{address:$a, port:$p, name:$n}'
       done
     ) | jq -s .
@@ -282,7 +298,7 @@ build_topology() {
     (( n > 0 )) || die "BP topology_bp.json: no relays provided in pool_topology"
 
     local access_points
-    access_points="$(build_access_points_array relay_ips relay_names "$RELAY_PORT")"
+    access_points="$(build_access_points_array relay_ips relay_names relay_ports)"
 
     jq -n \
       --argjson ap "$access_points" \
@@ -319,22 +335,26 @@ build_topology() {
 
     local bp_only_ips=("$bp_ip")
     local bp_only_names=("BP")
+    local bp_only_ports=("$BP_PORT")
 
     local relay_only_ips=()
     local relay_only_names=()
+    local relay_only_ports=()
 
     for i in "${!relay_ips[@]}"; do
       local rip="${relay_ips[$i]}"
       local rname="${relay_names[$i]:-Relay$((i+1))}"
+      local rport="${relay_ports[$i]:-3001}"
       [[ "$rip" == "$self_ip" ]] && continue
       relay_only_ips+=("$rip")
       relay_only_names+=("$rname")
+      relay_only_ports+=("$rport")
     done
 
     local bp_ap relay_ap local_access_points
-    bp_ap="$(build_access_points_array bp_only_ips bp_only_names "$BP_PORT")"
+    bp_ap="$(build_access_points_array bp_only_ips bp_only_names bp_only_ports)"
     if (( ${#relay_only_ips[@]} > 0 )); then
-      relay_ap="$(build_access_points_array relay_only_ips relay_only_names "$RELAY_PORT")"
+      relay_ap="$(build_access_points_array relay_only_ips relay_only_names relay_only_ports)"
       local_access_points="$(jq -n --argjson a "$bp_ap" --argjson b "$relay_ap" '$a + $b')"
     else
       local_access_points="$bp_ap"
@@ -371,9 +391,9 @@ write_run_scripts() {
   local node_bin="$3"
   local port="$4"
 
-  local run_relay="$HOME/$node_dir/run.relay.sh"
-  local run_relaylike="$HOME/$node_dir/run.relaylike.sh"
-  local run_bp="$HOME/$node_dir/run.bp.sh"
+  local run_relay="$NODE_BASE/$node_dir/run.relay.sh"
+  local run_relaylike="$NODE_BASE/$node_dir/run.relaylike.sh"
+  local run_bp="$NODE_BASE/$node_dir/run.bp.sh"
 
   if [[ "$node_type" == "relay" ]]; then
     # Real relay runner
@@ -381,7 +401,7 @@ write_run_scripts() {
 #!/bin/bash
 set -euo pipefail
 
-NODE_HOME="\$HOME/$node_dir"
+NODE_HOME="$NODE_BASE/$node_dir"
 export CARDANO_NODE_SOCKET_PATH="\$NODE_HOME/socket/node.socket"
 
 exec "$node_bin" run \\
@@ -401,7 +421,7 @@ EOF
 #!/bin/bash
 set -euo pipefail
 
-NODE_HOME="\$HOME/$node_dir"
+NODE_HOME="$NODE_BASE/$node_dir"
 export CARDANO_NODE_SOCKET_PATH="\$NODE_HOME/socket/node.socket"
 
 exec "$node_bin" run \\
@@ -458,9 +478,9 @@ After=network-online.target
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$HOME/$node_dir
+WorkingDirectory=$NODE_BASE/$node_dir
 Environment=SPOT_PATH=$SPOT_DIR
-Environment=CARDANO_NODE_SOCKET_PATH=$HOME/$node_dir/socket/node.socket
+Environment=CARDANO_NODE_SOCKET_PATH=$NODE_BASE/$node_dir/socket/node.socket
 Restart=always
 RestartSec=5
 LimitNOFILE=131072
@@ -484,7 +504,7 @@ install_gliveview() {
   local port="$2"          # 3000 or 3001
   local node_type="$3"     # bp or relay
 
-  local home="$HOME/$node_dir"
+  local home="$NODE_BASE/$node_dir"
   log "Installing gLiveView into $home"
 
   ( cd "$home" && \
@@ -518,7 +538,7 @@ install_gliveview() {
   local envf="$home/env"
 
   # CNODE paths
-  set_kv "CNODE_HOME" "\"\${HOME}/${node_dir}\"" "$envf"
+  set_kv "CNODE_HOME" "\"${NODE_BASE}/${node_dir}\"" "$envf"
   set_kv "CNODE_PORT" "${port}"                  "$envf"
   set_kv "CONFIG"     "\"\${CNODE_HOME}/config/config.json\"" "$envf"
   set_kv "SOCKET"     "\"\${CNODE_HOME}/socket/node.socket\"" "$envf"
@@ -566,7 +586,7 @@ download_env_files() {
   local node_type="$2"
 
   log "Downloading ${ENV_NAME} config/genesis/topology..."
-  cd "$HOME/$node_dir/config"
+  cd "$NODE_BASE/$node_dir/config"
 
   # Correct templates:
   # - BP uses config-bp.json
@@ -585,6 +605,9 @@ download_env_files() {
 
   # Book topology references peer-snapshot; ensure it's present too
   fetch "$BASE_URL/peer-snapshot.json" "peer-snapshot.json"
+
+  # Checkpoints file (required by cardano-node 10.x+ when config references CheckpointsFile)
+  fetch "$BASE_URL/checkpoints.json" "checkpoints.json"
 }
 
 # ------------------------------------------------------------
@@ -605,7 +628,7 @@ source "$NS_PATH/utils.sh"
 apt_install_if_missing jq curl bc tcptraceroute
 
 log "Reading pool topology and node identity..."
-read -r ERROR NODE_TYPE BP_IP RELAYS < <(get_topo "$TOPO_FILE")
+read -r ERROR NODE_TYPE BP_IP BP_PORT RELAYS < <(get_topo "$TOPO_FILE")
 # shellcheck disable=SC2206
 RELAYS=($RELAYS)
 
@@ -626,15 +649,23 @@ if (( cnt == 0 )); then
   RELAY_IPS=()
   RELAY_NAMES=()
   RELAY_IPS_PUB=()
+  RELAY_PORTS=()
 else
-  (( cnt % 3 == 0 )) || die "RELAYS list length ($cnt) is not divisible by 3. pool_topology or get_topo output may be inconsistent."
-  n=$((cnt/3))
+  (( cnt % 4 == 0 )) || die "RELAYS list length ($cnt) is not divisible by 4. pool_topology or get_topo output may be inconsistent."
+  n=$((cnt/4))
   RELAY_IPS=( "${RELAYS[@]:0:$n}" )
   RELAY_NAMES=( "${RELAYS[@]:$n:$n}" )
   RELAY_IPS_PUB=( "${RELAYS[@]:$((2*n)):$n}" )
+  RELAY_PORTS=( "${RELAYS[@]:$((3*n)):$n}" )
 
   (( ${#RELAY_IPS[@]} == ${#RELAY_NAMES[@]} )) || die "Relay IP/name count mismatch"
   (( ${#RELAY_IPS[@]} == ${#RELAY_IPS_PUB[@]} )) || die "Relay IP/pubIP count mismatch"
+  (( ${#RELAY_IPS[@]} == ${#RELAY_PORTS[@]} )) || die "Relay IP/port count mismatch"
+fi
+
+# Override defaults with topology-derived ports
+if (( ${#RELAY_PORTS[@]} > 0 )); then
+  RELAY_PORT="${RELAY_PORTS[0]}"
 fi
 
 log "NODE_TYPE:     $NODE_TYPE"
@@ -642,6 +673,13 @@ log "BP_IP:         $BP_IP"
 log "RELAY_IPS:     ${RELAY_IPS[*]:-none}"
 log "RELAY_NAMES:   ${RELAY_NAMES[*]:-none}"
 log "RELAY_IPS_PUB: ${RELAY_IPS_PUB[*]:-none}"
+log "BP_PORT:       $BP_PORT"
+log "RELAY_PORTS:   ${RELAY_PORTS[*]:-none}"
+
+# Prompt for node base directory (where node.bp / node.relay will be created)
+NODE_BASE="${NODE_BASE:-$HOME}"
+NODE_BASE="$(prompt_input_default NODE_BASE "$NODE_BASE")"
+mkdir -p "$NODE_BASE"
 
 # Set bashrc SOCKET_PATH. For hybrid, default to BP socket (for cardano-cli).
 if [[ "$NODE_TYPE" == "hybrid" ]]; then
@@ -674,19 +712,20 @@ for CURRENT_TYPE in "${SETUP_TYPES[@]}"; do
     NODE_PORT="$RELAY_PORT"
   fi
 
-  log "====== Setting up $CURRENT_TYPE node in ~/$NODE_DIR ======"
+  log "====== Setting up $CURRENT_TYPE node in $NODE_BASE/$NODE_DIR ======"
 
-  log "Preparing directories under ~/$NODE_DIR ..."
+  log "Preparing directories under $NODE_BASE/$NODE_DIR ..."
   ensure_dir_layout "$NODE_DIR"
 
   # For --topology-only, we still want the book files present and patched consistently.
   download_env_files "$NODE_DIR" "$CURRENT_TYPE"
   log "Patching topology.json (useLedgerAfterSlot -> 0)..."
-  patch_topology_useLedgerAfterSlot "$HOME/$NODE_DIR/config/topology.json" 0
+  patch_topology_useLedgerAfterSlot "$NODE_BASE/$NODE_DIR/config/topology.json" 0
 
   # For hybrid, substitute loopback for local IPs in topology
   TOPO_BP_IP="$BP_IP"
   TOPO_RELAY_IPS=("${RELAY_IPS[@]}")
+  TOPO_RELAY_PORTS=("${RELAY_PORTS[@]}")
   if [[ "$NODE_TYPE" == "hybrid" ]]; then
     if [[ "$CURRENT_TYPE" == "relay" ]]; then
       # Relay should reach BP via loopback
@@ -703,8 +742,8 @@ for CURRENT_TYPE in "${SETUP_TYPES[@]}"; do
 
   if (( ONLY_TOPOLOGY == 1 )); then
     log "Topology-only mode: regenerating topology for $CURRENT_TYPE..."
-    build_topology "$NODE_DIR" "$CURRENT_TYPE" "$TOPO_BP_IP" "${TOPO_RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
-    log "Done. Wrote: $HOME/$NODE_DIR/config/topology.json"
+    build_topology "$NODE_DIR" "$CURRENT_TYPE" "$TOPO_BP_IP" "${TOPO_RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}" --ports "${TOPO_RELAY_PORTS[@]}"
+    log "Done. Wrote: $NODE_BASE/$NODE_DIR/config/topology.json"
     continue
   fi
 
@@ -712,7 +751,7 @@ for CURRENT_TYPE in "${SETUP_TYPES[@]}"; do
   patch_config_minimal "$NODE_DIR" "$CURRENT_TYPE"
 
   log "Building node-specific topology.json..."
-  build_topology "$NODE_DIR" "$CURRENT_TYPE" "$TOPO_BP_IP" "${TOPO_RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}"
+  build_topology "$NODE_DIR" "$CURRENT_TYPE" "$TOPO_BP_IP" "${TOPO_RELAY_IPS[@]}" --names "${RELAY_NAMES[@]}" --ports "${TOPO_RELAY_PORTS[@]}"
 
   if (( PREPARE_ONLY == 1 )); then
     log "Prepare-only mode: skipping binary discovery, run scripts, systemd, gLiveView for $CURRENT_TYPE."
@@ -731,10 +770,10 @@ for CURRENT_TYPE in "${SETUP_TYPES[@]}"; do
   write_run_scripts "$NODE_DIR" "$CURRENT_TYPE" "$CARDANO_NODE_BIN" "$NODE_PORT"
 
   if [[ "$CURRENT_TYPE" == "relay" ]]; then
-    install_systemd_unit "$NODE_DIR" "$CURRENT_TYPE" "run.relay" "$HOME/$NODE_DIR/run.relay.sh"
+    install_systemd_unit "$NODE_DIR" "$CURRENT_TYPE" "run.relay" "$NODE_BASE/$NODE_DIR/run.relay.sh"
   else
     # For BP we initially use relaylike runner to sync safely
-    install_systemd_unit "$NODE_DIR" "$CURRENT_TYPE" "run.bp" "$HOME/$NODE_DIR/run.relaylike.sh"
+    install_systemd_unit "$NODE_DIR" "$CURRENT_TYPE" "run.bp" "$NODE_BASE/$NODE_DIR/run.relaylike.sh"
   fi
 
   log "Installing gLiveView for $CURRENT_TYPE..."
@@ -765,16 +804,16 @@ if [[ "$NODE_TYPE" == "hybrid" ]]; then
   echo "  Start Relay:                             sudo systemctl start run.relay"
   echo "  View BP logs:                            journalctl -u run.bp -f"
   echo "  View Relay logs:                         journalctl -u run.relay -f"
-  echo "  gLiveView BP:                            cd ~/node.bp && ./gLiveView.sh"
-  echo "  gLiveView Relay:                         cd ~/node.relay && ./gLiveView.sh"
+  echo "  gLiveView BP:                            cd $NODE_BASE/node.bp && ./gLiveView.sh"
+  echo "  gLiveView Relay:                         cd $NODE_BASE/node.relay && ./gLiveView.sh"
 elif [[ "$NODE_TYPE" == "bp" ]]; then
   echo "  Start BP (sync-safe relay-like mode):  sudo systemctl start run.bp"
   echo "  View logs:                            journalctl -u run.bp -f"
-  echo "  gLiveView:                            cd ~/node.bp && ./gLiveView.sh"
+  echo "  gLiveView:                            cd $NODE_BASE/node.bp && ./gLiveView.sh"
 else
   echo "  Start relay:                           sudo systemctl start run.relay"
   echo "  View logs:                             journalctl -u run.relay -f"
-  echo "  gLiveView:                             cd ~/node.relay && ./gLiveView.sh"
+  echo "  gLiveView:                             cd $NODE_BASE/node.relay && ./gLiveView.sh"
 fi
 echo
 echo "Note: binary distribution + chain DB copying is handled in init_part3.sh / part4."

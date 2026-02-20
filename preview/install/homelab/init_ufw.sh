@@ -58,7 +58,15 @@ run() {
 }
 
 REAL_HOME="$(getent passwd "${SUDO_USER:-$USER}" | cut -d: -f6)"
-TOPO_FILE="${TOPO_FILE:-$REAL_HOME/pool_topology}"
+if [[ -n "${TOPO_FILE:-}" ]]; then
+  : # explicit override
+elif [[ -f "$REAL_HOME/pool_topology" ]]; then
+  TOPO_FILE="$REAL_HOME/pool_topology"
+elif [[ -f "/data/pool_topology" ]]; then
+  TOPO_FILE="/data/pool_topology"
+else
+  TOPO_FILE="$REAL_HOME/pool_topology"  # will fail later with a clear error
+fi
 
 RESET_UFW="${RESET_UFW:-1}"
 
@@ -84,25 +92,32 @@ UTILS="$SPOT_DIR/scripts/utils.sh"
 source "$UTILS"
 
 log "Detecting node type from $TOPO_FILE ..."
-read -r ERROR NODE_TYPE BP_IP RELAYS < <(get_topo "$TOPO_FILE")
+read -r ERROR NODE_TYPE BP_IP BP_PORT RELAYS < <(get_topo "$TOPO_FILE")
 # shellcheck disable=SC2206
 RELAYS=($RELAYS)
 
 [[ "$ERROR" == "none" ]] || die "$ERROR"
 [[ "$NODE_TYPE" == "bp" || "$NODE_TYPE" == "relay" || "$NODE_TYPE" == "hybrid" ]] || die "NODE_TYPE not detected correctly (got '$NODE_TYPE')"
 
-# RELAYS comes as triples: relay_ip relay_name relay_pub
+# RELAYS comes as quadruples: relay_ip relay_name relay_pub relay_port
 cnt=${#RELAYS[@]}
 RELAY_IPS=()
 RELAY_NAMES=()
 RELAY_IPS_PUB=()
+RELAY_PORTS=()
 
 if (( cnt > 0 )); then
-  (( cnt % 3 == 0 )) || die "RELAYS list length ($cnt) not divisible by 3"
-  n=$((cnt/3))
+  (( cnt % 4 == 0 )) || die "RELAYS list length ($cnt) not divisible by 4"
+  n=$((cnt/4))
   RELAY_IPS=( "${RELAYS[@]:0:$n}" )
   RELAY_NAMES=( "${RELAYS[@]:$n:$n}" )
   RELAY_IPS_PUB=( "${RELAYS[@]:$((2*n)):$n}" )
+  RELAY_PORTS=( "${RELAYS[@]:$((3*n)):$n}" )
+fi
+
+# Override defaults with topology-derived ports
+if (( ${#RELAY_PORTS[@]} > 0 )); then
+  RELAY_PORT="${RELAY_PORTS[0]}"
 fi
 
 LOCAL_IP="$(hostname -I | awk '{print $1}')"
