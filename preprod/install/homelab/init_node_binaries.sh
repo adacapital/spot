@@ -37,9 +37,10 @@ echo
 echo '---------------- Installing dependencies ----------------'
 sudo apt-get update -y
 sudo apt-get upgrade -y
-sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf liblmdb-dev libffi7 libgmp10 libncurses-dev libncurses5 libtinfo5 llvm-12 numactl libnuma-dev -y
-sudo apt-get install bc tcptraceroute curl -y
-sudo apt-get install firewalld
+# Per IOG: https://developers.cardano.org/docs/get-started/infrastructure/node/installing-cardano-node/
+sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libncurses-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libtool autoconf liblmdb-dev libsnappy-dev protobuf-compiler liburing-dev
+sudo apt-get install -y bc tcptraceroute curl
+sudo apt-get install -y firewalld
 sudo systemctl enable firewalld
 sudo systemctl start firewalld
 
@@ -54,20 +55,38 @@ sudo cp $CONF_PATH/chrony.conf /etc/chrony/chrony.conf
 sudo systemctl restart chrony
 
 echo
+echo '---------------- Resolving versions from iohk-nix (single source of truth) ----------------'
+# Prompt for cardano-node tag once, then derive all pinned C-lib versions from iohk-nix flake.lock.
+# This is the same cascade documented at:
+#   https://developers.cardano.org/docs/get-started/infrastructure/node/installing-cardano-node/
+LATESTTAG=$(curl -s https://api.github.com/repos/intersectmbo/cardano-node/releases/latest | jq -r .tag_name)
+LATESTTAG=$(prompt_input_default CARDANO_NODE_TAG $LATESTTAG)
+
+IOHKNIX_VERSION=$(curl -s https://raw.githubusercontent.com/IntersectMBO/cardano-node/$LATESTTAG/flake.lock | jq -r '.nodes.iohkNix.locked.rev')
+SODIUM_VERSION=$(curl -s https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.sodium.original.rev')
+SECP256K1_VERSION=$(curl -s https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.secp256k1.original.ref')
+BLST_VERSION=$(curl -s https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock | jq -r '.nodes.blst.original.ref')
+
+echo "CARDANO_NODE_TAG:  $LATESTTAG"
+echo "IOHKNIX_VERSION:   $IOHKNIX_VERSION"
+echo "SODIUM_VERSION:    $SODIUM_VERSION"
+echo "SECP256K1_VERSION: $SECP256K1_VERSION"
+echo "BLST_VERSION:      $BLST_VERSION"
+
+if ! promptyn "Versions resolved. Proceed? (y/n)"; then
+    echo "Ok bye!"
+    exit 1
+fi
+
+echo
 echo '---------------- Cabal & GHC dependency ----------------'
 curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
 
 # This is an interactive session make sure to start a new shell before resuming the rest of the install process below.
 
-echo "Installing ghc 8.10.7"
-ghcup install ghc 8.10.7
-echo
-
-echo "Installing cabal 3.8.1.0"
-ghcup install cabal 3.8.1.0
-
-ghcup set ghc 8.10.7
-ghcup set cabal 3.8.1.0
+# Per IOG docs (re-check on each upgrade):
+ghcup install ghc 9.6.7 --set
+ghcup install cabal 3.12.1.0 --set
 
 echo "Make sure ghc and cabal points to .ghcup locations."
 echo "If not you may have to add the below to your .bashrc:"
@@ -94,7 +113,7 @@ if [[ $ISLIBSODIUM -eq 0 ]];then
     cd $DOWNLOAD_PATH
     git clone https://github.com/intersectmbo/libsodium
     cd libsodium
-    git checkout dbb48cc
+    git checkout "$SODIUM_VERSION"
     ./autogen.sh
     ./configure
     make
@@ -112,10 +131,9 @@ if [[ $ISSECP256K1 -eq 0 ]];then
     cd $DOWNLOAD_PATH
     git clone https://github.com/bitcoin-core/secp256k1.git
     cd secp256k1
-    # git reset --hard ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-    git checkout ac83be33
+    git fetch --all --tags
+    git checkout "$SECP256K1_VERSION"
     ./autogen.sh
-    # ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
     ./configure --enable-module-schnorrsig --enable-experimental
     make
     make check
@@ -134,8 +152,10 @@ if [[ $ISBLST -eq 0 ]];then
 
     git clone https://github.com/supranational/blst
     cd blst
-    git checkout v0.3.10
+    git fetch --all --tags
+    git checkout "$BLST_VERSION"
     ./build.sh
+    BLST_PC_VERSION="${BLST_VERSION#v}"
     cat > libblst.pc << EOF
 prefix=/usr/local
 exec_prefix=\${prefix}
@@ -145,7 +165,7 @@ includedir=\${prefix}/include
 Name: libblst
 Description: Multilingual BLS12-381 signature library
 URL: https://github.com/supranational/blst
-Version: 0.3.10
+Version: $BLST_PC_VERSION
 Cflags: -I\${includedir}
 Libs: -L\${libdir} -lblst
 EOF
@@ -153,15 +173,6 @@ EOF
     sudo cp bindings/blst_aux.h bindings/blst.h bindings/blst.hpp  /usr/local/include/
     sudo cp libblst.a /usr/local/lib
     sudo chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
-
-    git clone https://github.com/bitcoin-core/secp256k1.git
-    cd secp256k1
-    git reset --hard ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-    ./autogen.sh
-    ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
-    make
-    make check
-    sudo make install
 else
     echo "libblst lib found, no installation required."
 fi
@@ -217,13 +228,10 @@ echo '---------------- Building cardano-node with cabal ----------------'
 INSTALL_PATH=$HOME/data
 INSTALL_PATH=$(prompt_input_default INSTALL_PATH $INSTALL_PATH)
 
-LATESTTAG=$(curl -s https://api.github.com/repos/intersectmbo/cardano-node/releases/latest | jq -r .tag_name)
-LATESTTAG=$(prompt_input_default CHECKOUT_TAG $LATESTTAG)
-
 echo
 echo "Details of your cardano-node build:"
 echo "INSTALL_PATH: $INSTALL_PATH"
-echo "LATESTTAG: $LATESTTAG"
+echo "CARDANO_NODE_TAG: $LATESTTAG"
 if ! promptyn "Please confirm you want to proceed? (y/n)"; then
     echo "Ok bye!"
     exit 1
@@ -237,10 +245,9 @@ git clone https://github.com/intersectmbo/cardano-node.git
 cd cardano-node
 
 git fetch --all --recurse-submodules --tags
-# git checkout $LATESTTAG
 git checkout tags/$LATESTTAG
 
-echo "with-compiler: ghc-8.10.7" >> cabal.project.local
+echo "with-compiler: ghc-9.6.7" >> cabal.project.local
 
 echo
 git describe --tags
@@ -251,18 +258,7 @@ if ! promptyn "Is this the correct tag? (y/n)"; then
     exit 1
 fi
 
-# cabal configure -O0 -w ghc-8.10.7
-
-# echo -e "package cardano-crypto-praos\n flags: -external-libsodium-vrf" > cabal.project.local
-# sed -i $HOME/.cabal/config -e "s/overwrite-policy:/overwrite-policy: always/g"
-# rm -rf dist-newstyle/build/aarch64-linux/ghc-8.10.7
-
-# echo "with-compiler: ghc-8.10.7" >> cabal.project.local
-# echo -e "package cardano-crypto-praos\n  flags: -external-libsodium-vrf" >> cabal.project.local
-
 cabal update
-# cabal build all 2>&1 | tee /tmp/build.cardano-node.log
-# cabal build cardano-cli cardano-node cardano-submit-api bech32
 cabal build all
 
 cp -p "$($ROOT_DIR/scripts/bin_path.sh cardano-cli $INSTALL_PATH/cardano-node)" ~/.local/bin/

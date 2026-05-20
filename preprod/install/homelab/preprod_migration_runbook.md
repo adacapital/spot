@@ -214,6 +214,37 @@ ss -tulnp | grep 3001
 
 ---
 
+# Step 7b — Relay sudoers for BP-driven automation
+
+BP→relay automation (binary distribution via `update_node_binaries.sh`, DB seeding via `init_part3.sh`, fault recovery) connects over SSH as the `cardano` user and runs `sudo -n systemctl {stop,start} run.relay` on the relay. This requires a NOPASSWD sudoers entry, otherwise `sudo -n` fails and the relay keeps running its old state silently.
+
+Configuration on each relay:
+
+```
+sudo tee /etc/sudoers.d/cardano-systemctl > /dev/null <<'EOF'
+cardano ALL=(root) NOPASSWD: /usr/bin/systemctl stop run.relay, /usr/bin/systemctl start run.relay, /usr/bin/systemctl restart run.relay, /usr/bin/systemctl status run.relay, /usr/bin/systemctl is-active run.relay
+EOF
+sudo chmod 0440 /etc/sudoers.d/cardano-systemctl
+sudo chown root:root /etc/sudoers.d/cardano-systemctl
+sudo visudo -c -f /etc/sudoers.d/cardano-systemctl
+```
+
+Always validate with `visudo -c` before trusting the file — a malformed sudoers entry can lock out sudo entirely.
+
+Verification from the BP:
+
+```
+ssh -i ~/.ssh/id_ed25519 cardano@<relay-ip> 'sudo -n systemctl is-active run.relay; echo rc=$?'
+```
+
+Expected:
+`active` followed by `rc=0`.
+
+Purpose:
+Allow the BP to stop/start the relay's `run.relay` service over SSH without an interactive password prompt, narrowly scoped to systemctl actions on that one unit.
+
+---
+
 # Step 8 — Pool Registration Update
 
 Pool registration updated to DNS relay.
@@ -334,6 +365,7 @@ If relay fails:
 | BP not forging                 | Relay unreachable       |
 | DNS resolves but no connection | Firewall rule missing   |
 | Firewall ALLOW rule ignored    | Rule ID higher than BLOCK rule (see Step 4 gotcha) |
+| Binary update appears to succeed but relay still runs old version | NOPASSWD sudoers missing on relay (see Step 7b) — `sudo -n` failed silently |
 | Transaction submission fails   | No usable UTXO          |
 
 ---

@@ -63,7 +63,18 @@ if [[ $NODE_TYPE == "bp" ]]; then
     sudo apt-get update -y
     sudo apt-get upgrade -y
 
+    # Per IOG: https://developers.cardano.org/docs/get-started/infrastructure/node/installing-cardano-node/
+    # Idempotent — already-installed pkgs are skipped. Catches new deps IOG adds between releases.
+    sudo apt-get install -y automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libncurses-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libtool autoconf liblmdb-dev libsnappy-dev protobuf-compiler liburing-dev
+
     cardano-cli --version
+
+    echo
+    echo '---------------- Ensuring GHC and cabal versions (IOG recommended) ----------------'
+    ghcup install ghc 9.6.7 --set
+    ghcup install cabal 3.12.1.0 --set
+    ghc --version
+    cabal --version
 
     echo
     echo '---------------- Updating the node from source ---------------- '
@@ -95,15 +106,56 @@ if [[ $NODE_TYPE == "bp" ]]; then
         exit 1
     fi
 
-    # echo "with-compiler: ghc-8.10.7" >> cabal.project.local
-    echo "with-compiler: ghc-9.6.3" >> cabal.project.local
+    echo "with-compiler: ghc-9.6.7" >> cabal.project.local
 
     cabal clean
     cabal update
-    # cabal build all
-    cabal build cardano-node
-    cabal build cardano-cli
 
+    # CABAL_JOBS throttles concurrent ghc workers — defaults to 2 to keep memory
+    # use sane on 8GB hosts (cardano-node has been observed to OOM at -j auto).
+    # Override with: CABAL_JOBS=4 ./update_node_binaries.sh ...
+    CABAL_JOBS="${CABAL_JOBS:-2}"
+    BUILD_LOG_NODE="/tmp/build.cardano-node.${NOW}.log"
+    BUILD_LOG_CLI="/tmp/build.cardano-cli.${NOW}.log"
+
+    echo
+    echo "Building cardano-node (-j$CABAL_JOBS, log: $BUILD_LOG_NODE)..."
+    set -o pipefail
+    cabal build cardano-node -j"$CABAL_JOBS" 2>&1 | tee "$BUILD_LOG_NODE"
+    rc=$?
+    set +o pipefail
+    if [[ $rc -ne 0 ]]; then
+        echo "ERROR: cabal build cardano-node failed (rc=$rc). See $BUILD_LOG_NODE"
+        exit 1
+    fi
+
+    echo
+    echo "Building cardano-cli (-j$CABAL_JOBS, log: $BUILD_LOG_CLI)..."
+    set -o pipefail
+    cabal build cardano-cli -j"$CABAL_JOBS" 2>&1 | tee "$BUILD_LOG_CLI"
+    rc=$?
+    set +o pipefail
+    if [[ $rc -ne 0 ]]; then
+        echo "ERROR: cabal build cardano-cli failed (rc=$rc). See $BUILD_LOG_CLI"
+        exit 1
+    fi
+
+    # Verify the binaries cabal claimed to build actually exist on disk.
+    # plan.json can list a path even if the build step never produced it.
+    NODE_BIN_PATH=$("$NS_PATH/bin_path.sh" cardano-node "$ROOT_PATH/cardano-node")
+    CLI_BIN_PATH=$("$NS_PATH/bin_path.sh" cardano-cli "$ROOT_PATH/cardano-node")
+    for f in "$NODE_BIN_PATH" "$CLI_BIN_PATH"; do
+        if [[ ! -x "$f" ]]; then
+            echo "ERROR: expected built binary not found or not executable: $f"
+            echo "       Logs: $BUILD_LOG_NODE, $BUILD_LOG_CLI"
+            exit 1
+        fi
+    done
+
+    echo
+    echo "Build verified:"
+    echo "  cardano-node: $NODE_BIN_PATH"
+    echo "  cardano-cli:  $CLI_BIN_PATH"
     echo
     if ! promptyn "Build complete, ready to stop/restart services? (y/n)"; then
         echo "Ok bye!"
@@ -112,18 +164,28 @@ if [[ $NODE_TYPE == "bp" ]]; then
 
     echo
     echo '---------------- Stopping node services ---------------- '
-    sudo systemctl stop cncli_sync
+    if systemctl cat cncli_sync.service &>/dev/null; then
+        echo "Stopping cncli_sync service..."
+        sudo systemctl stop cncli_sync
+    else
+        echo "cncli_sync service not installed on this host — skipping."
+    fi
     sudo systemctl stop run.bp
 
-    cp -p "$($NS_PATH/bin_path.sh cardano-cli $ROOT_PATH/cardano-node)" ~/.local/bin/
-    cp -p "$($NS_PATH/bin_path.sh cardano-node $ROOT_PATH/cardano-node)" ~/.local/bin/
+    cp -p "$CLI_BIN_PATH" ~/.local/bin/
+    cp -p "$NODE_BIN_PATH" ~/.local/bin/
     cardano-cli --version
     cardano-node --version
 
     echo
     echo '---------------- Starting node services ---------------- '
     sudo systemctl start run.bp
-    sudo systemctl start cncli_sync
+    if systemctl cat cncli_sync.service &>/dev/null; then
+        echo "Starting cncli_sync service..."
+        sudo systemctl start cncli_sync
+    else
+        echo "cncli_sync service not installed on this host — skipping."
+    fi
 
     echo 'Node binaries update completed on BP node!'
 
@@ -136,26 +198,46 @@ if [[ $NODE_TYPE == "bp" ]]; then
     echo
     echo '---------------- Getting other peers ready... ----------------'
 
+    # Use the BP VM's local SSH identity (default: id_ed25519)
+    SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
+    SSH_OPTS="-o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5"
+    SCP_OPTS="-o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5"
+
+    remote() {
+        local ip="$1" cmd="$2"
+        ssh $SSH_OPTS -i "$SSH_KEY" "cardano@${ip}" "$cmd"
+    }
+
+    remote_scp_to() {
+        local ip="$1" src="$2" dst="$3"
+        scp $SCP_OPTS -i "$SSH_KEY" "$src" "cardano@${ip}:${dst}"
+    }
+
     RELAYS_COUNT=${#RELAY_IPS[@]}
 
-    for (( i=0; i<${RELAYS_COUNT}; i++ ));
-    do
-        echo "Checking ${RELAY_IPS[$i]} is online..."
-        nc -zvw3 ${RELAY_IPS[$i]} 22 &>/dev/null
-        status=$( echo $? )
-        if [[ $status == 0 ]] ; then
-            echo "Online"
-            echo '---------------- Stopping node services... ----------------'
-            ssh -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} cardano@${RELAY_IPS[$i]} 'sudo systemctl stop run.relay'
-            echo '---------------- Copying cardano binaries... ----------------'
-            scp -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} ~/.local/bin/cardano* cardano@${RELAY_IPS[$i]}:/home/cardano/.local/bin
-            echo '---------------- Starting node services... ----------------'
-            ssh -i ~/.ssh/adact-preprod-${RELAY_NAMES[$i]} cardano@${RELAY_IPS[$i]} 'sudo systemctl start run.relay'
+    for (( i=0; i<${RELAYS_COUNT}; i++ )); do
+        ip="${RELAY_IPS[$i]}"
+        name="${RELAY_NAMES[$i]}"
 
-            echo "Node binaries update completed on ${RELAY_NAMES[$i]} node!"
-        else
-            echo "Offline"
+        echo
+        echo "Relay $name ($ip): checking SSH connectivity..."
+        if ! remote "$ip" "echo ok >/dev/null"; then
+            echo "Relay $name ($ip): unreachable via SSH (with $SSH_KEY), skipping."
+            continue
         fi
+
+        echo "Relay $name ($ip): stopping relay service..."
+        remote "$ip" "sudo -n systemctl stop run.relay"
+
+        echo "Relay $name ($ip): copying cardano binaries..."
+        remote_scp_to "$ip" "$HOME/.local/bin/cardano-node" "/home/cardano/.local/bin/cardano-node"
+        remote_scp_to "$ip" "$HOME/.local/bin/cardano-cli"  "/home/cardano/.local/bin/cardano-cli"
+        remote "$ip" "chmod 755 ~/.local/bin/cardano-node ~/.local/bin/cardano-cli && ~/.local/bin/cardano-node --version && ~/.local/bin/cardano-cli --version"
+
+        echo "Relay $name ($ip): starting relay service..."
+        remote "$ip" "sudo -n systemctl start run.relay"
+
+        echo "Node binaries update completed on $name node!"
     done
 
     echo
