@@ -27,6 +27,9 @@ Open items for the spot repo and homelab infrastructure. Add entries with a one-
 - **Apollo: confirm `git pull` of bin_path.sh fix.**
   Commit `9dceb39` aligned preview's bin_path.sh to the canonical 2-arg signature. Apollo may not have pulled it yet — non-blocking for current state but worth syncing.
 
+- **Generalize `node_sync_from_mithril.sh` for preprod and mainnet.**
+  *Discovered: 2026-05-20.* The preview script (`preview/scripts/node_sync_from_mithril.sh`) is hardcoded for `pre-release-preview` Mithril endpoints and `/data/`-rooted paths. For mainnet/preprod we'd need a portable version that either takes the network as a parameter or derives it (network name from `$SPOT_DIR` basename like other scripts do). Mainnet endpoints are `release-mainnet`; preprod uses `release-preprod`. See [HOMELAB.md](HOMELAB.md) "Mithril bootstrap" section for the endpoint table.
+
 ## Documentation gaps
 
 - **Mainnet migration runbook.**
@@ -41,3 +44,9 @@ Open items for the spot repo and homelab infrastructure. Add entries with a one-
   Check `~/.ghcup/ghc/` for non-9.6.7 directories. Each ~2 GB. Remove with `ghcup rm ghc <version>`.
 
 - **Old C lib source clones in `/home/cardano/download/`** (athena/hermes' default location) — kept around since Jan install; not actively used (the rebuild creates fresh clones via `init_node_binaries.sh`'s logic). Optional cleanup.
+
+- **Apollo: delete `/data/node.{bp,relay}/db.fork-2026*.bak` after a few days of stable forging on canonical chain.**
+  *Discovered: 2026-05-20.* These are the pre-Mithril-bootstrap private-fork DB directories, kept around as a safety net during recovery. Each is several GB. Wait until you have several days of cleanly-forged canonical blocks visible on cexplorer before deleting, then `sudo rm -rf` them. `/data` has 277 GB free, so no urgency.
+
+- **Config.json tracing-system migration on all three hosts.**
+  *Discovered: 2026-05-20.* Local `config.json` files use the legacy per-trace-field system (40+ `Trace*` keys), IOG canonical has moved to the unified `TraceOptions` block with `TraceOptionForwarder` / `TraceOptionMetricsPrefix`. Cardano-node 11.x still accepts legacy fields so this isn't blocking — but worth modernizing for future-proofing. ~200 lines of config restructuring; do as a focused single-host session with careful testing.

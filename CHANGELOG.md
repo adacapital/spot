@@ -42,6 +42,39 @@ For per-host architectural details see [HOMELAB.md](HOMELAB.md). For open items 
 3. peer-snapshot.json is now mandatory in Genesis sync mode (replaces deprecated `bootstrapPeers`). IOG publishes per-env at `book.play.dev.cardano.org`.
 4. The BP→relay distribution loop only ships binaries; if the relay's apt deps are stale, the new binary fails to load. Pre-flight `ldd` check on the build artifact would catch this — see [TODO.md](TODO.md).
 
+### Apollo private fork recovery (Van Rossem aftermath)
+
+**Symptom**: After the 11.0.1 upgrade, apollo's BP forged 3 blocks at scheduled slots — `TraceForgedBlock` + `TraceAdoptedBlock` both logged cleanly, no rollback events, BP and relay agreed on the same tip hash, syncProgress 100%. But none of those blocks appeared on cexplorer or cardanoscan — cexplorer showed the pool's "last forged block" as 13 days ago.
+
+**Root cause**: The Van Rossem hard fork activated on preview on **May 8, 2026**, lifting the network to Protocol Version 11. Apollo was offline at that point (had been down for ~10 days). When we brought it back up post-upgrade on May 20, its DB held pre-fork chain state. The relay tried to sync canonical history from public peers, but each peer's rollback message referenced a block from ~12 days ago (~slot 111542393, the fork point), which is past cardano-node's default **historicity cutoff** (37 hours / 133200 seconds) — a deliberate Genesis-consensus safety mechanism that prevents very-old-history attacks. The relay rejected all reconciliation attempts with `HistoricityError`. It stuck at its May 10 tip. The BP then synced from the stuck relay, inherited the fork-point state, and started forging at scheduled slots — but only locally, on a chain only it and its relay believed in. Both progressing in lockstep on a private fork.
+
+**Why "mirror good DB from relay" didn't work**: standard recovery technique for a BP on the wrong chain. But here the relay was on the *same* private fork (identical tip hash). No local source of canonical chain data.
+
+**Why "wipe DB + resync from public peers" would have worked but is slow**: full resync from genesis takes 4-8 hours on apollo's hardware.
+
+**Fix recipe (~30 min total)**: Bootstrap both BP and relay from a **Mithril** snapshot with `--include-ancillary` for fast boot. Mithril provides cryptographically-verified DB snapshots; the ancillary flag includes the precomputed ledger state so cardano-node skips block replay from genesis on first start.
+
+```bash
+# Install + configure (preview-specific endpoints)
+export AGGREGATOR_ENDPOINT="https://aggregator.pre-release-preview.api.mithril.network/aggregator"
+export GENESIS_VERIFICATION_KEY=$(curl -s https://raw.githubusercontent.com/input-output-hk/mithril/main/mithril-infra/configuration/pre-release-preview/genesis.vkey)
+export ANCILLARY_VERIFICATION_KEY=$(curl -s https://raw.githubusercontent.com/input-output-hk/mithril/main/mithril-infra/configuration/pre-release-preview/ancillary.vkey)
+
+# Stop, move bad DBs aside, download Mithril snapshot, mirror to BP, restart
+# (full procedure scripted at preview/scripts/node_sync_from_mithril.sh)
+```
+
+Full script: [`preview/scripts/node_sync_from_mithril.sh`](preview/scripts/node_sync_from_mithril.sh). Mithril details and trust model in [HOMELAB.md](HOMELAB.md) under "Mithril bootstrap."
+
+**Critical missing parameter the first attempt**: without `--include-ancillary`, mithril-client only ships the immutable chain blocks and the node has to replay from genesis to rebuild ledger state — defeating the speed purpose. The warning "*The fast bootstrap of the Cardano node is not available with the current parameters*" was the giveaway. Always include ancillary for cardano-node bootstrap.
+
+**Lessons (now codified in this changelog + the script header)**:
+- If a node was offline across a hard fork, **always Mithril-bootstrap on restart**. Don't try to resync the stale DB — the historicity cutoff makes it un-reconcilable.
+- The "BP + relay agree on a tip hash" check is necessary but not sufficient for "you're on the canonical chain." Always also check: does that tip hash appear on cexplorer? If not, you're on a private fork even though everything looks healthy locally.
+- The community confirmed this is a recurring class of issue on SPO Discord ("just stuck on the fork with relays that didn't accept the hardfork tx … fix is re-bootstrap from mithril"). Worth incorporating into any future hard-fork-coverage runbook.
+
+**Mainnet implication**: same procedure applies — but use mainnet endpoints (`release-mainnet`) instead of `pre-release-preview`. See [HOMELAB.md](HOMELAB.md).
+
 ---
 
 ## 2026-02-20 — Preprod migration from OCI to homelab

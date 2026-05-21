@@ -89,3 +89,32 @@ Only deployed on the **mainnet** BP, used for block schedule. Not in preprod or 
 ## VRF key permissions
 
 cardano-node requires no "other" permissions on key files. Always `chmod 600`. If you see startup failures referencing VRF keys, check permissions first.
+
+## Mithril bootstrap
+
+**When to use it**: any time a node has been offline across a hard fork (or for more than ~37 hours through any significant chain event), the on-restart resync may fail with `HistoricityError` — cardano-node refuses to rollback that far for safety. Symptom: forged blocks invisible on cexplorer despite local `TraceAdoptedBlock` events; BP and relay agree on a tip hash that doesn't appear on explorers. Don't fight it — Mithril-bootstrap and move on.
+
+Mithril is IOG's stake-based threshold signature scheme that produces cryptographically-verified DB snapshots. The `mithril-client` CLI verifies the snapshot's Mithril certificate against on-chain stake, then extracts to your node's DB directory. With `--include-ancillary`, the snapshot also ships the precomputed ledger state, so cardano-node skips block replay from genesis on first start — making the total recovery time ~30 minutes instead of 4-8 hours.
+
+**Per-network endpoints**:
+
+| Env | AGGREGATOR_ENDPOINT | Verification keys |
+|---|---|---|
+| Preview | `https://aggregator.pre-release-preview.api.mithril.network/aggregator` | `…/configuration/pre-release-preview/{genesis,ancillary}.vkey` |
+| Preprod | `https://aggregator.release-preprod.api.mithril.network/aggregator` | `…/configuration/release-preprod/{genesis,ancillary}.vkey` |
+| Mainnet | `https://aggregator.release-mainnet.api.mithril.network/aggregator` | `…/configuration/release-mainnet/{genesis,ancillary}.vkey` |
+
+Verification key base URL: `https://raw.githubusercontent.com/input-output-hk/mithril/main/mithril-infra`.
+
+**Trust model**: the Mithril certificate (chain blocks) is verified via stake-based threshold signatures — no central trust. The ancillary files (ledger state) are signed by IOG keys, *not* the stake-based certificate. mithril-client prints a warning to that effect. Consistent with our existing trust of IOG-published genesis files and configs; documented at <https://mithril.network/doc/manual/getting-started/network-configurations>.
+
+**Script reference**: a complete preview bootstrap procedure is checked in at [`preview/scripts/node_sync_from_mithril.sh`](preview/scripts/node_sync_from_mithril.sh). When generalizing to preprod or mainnet, swap the network name in all three endpoint URLs (search for `pre-release-preview`) and adjust paths (`/data/...` → `/home/cardano/...` for athena/hermes; mainnet host TBD).
+
+**Important flags**:
+- `--include-ancillary` is **mandatory** for fast boot. Without it the node replays from genesis (hours).
+- `--download-dir <path>` should point at your node's directory (the script extracts a `db/` subdirectory there).
+- Run with `sudo -E` so the AGGREGATOR_ENDPOINT, GENESIS_VERIFICATION_KEY, and ANCILLARY_VERIFICATION_KEY env vars are preserved.
+
+**After bootstrap**: start the relay first (gives BP somewhere to peer to), let it briefly replay the snapshot (`Replayed block: ... 99.xx%` progressing), then start the BP. No `HistoricityError` should appear — that's the success indicator.
+
+Full chronological account of the 2026-05-20 apollo recovery in [CHANGELOG.md](CHANGELOG.md) under "Apollo private fork recovery (Van Rossem aftermath)."
