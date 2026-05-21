@@ -50,3 +50,6 @@ Open items for the spot repo and homelab infrastructure. Add entries with a one-
 
 - **Config.json tracing-system migration on all three hosts.**
   *Discovered: 2026-05-20.* Local `config.json` files use the legacy per-trace-field system (40+ `Trace*` keys), IOG canonical has moved to the unified `TraceOptions` block with `TraceOptionForwarder` / `TraceOptionMetricsPrefix`. Cardano-node 11.x still accepts legacy fields so this isn't blocking — but worth modernizing for future-proofing. ~200 lines of config restructuring; do as a focused single-host session with careful testing.
+
+- **Add `peer-snapshot.json` to mainnet topology.json (resilience).**
+  *Discovered: 2026-05-20.* Mainnet's topology.json doesn't reference `peerSnapshotFile` — predates the feature. Adding it (with the IOG-published file from `https://book.play.dev.cardano.org/environments/mainnet/peer-snapshot.json`) gives mainnet the same fast-bootstrap recovery path apollo benefited from. Especially worth doing before any future extended downtime risk (e.g., before next mainnet hard fork). Not blocking, but high-value resilience improvement.
